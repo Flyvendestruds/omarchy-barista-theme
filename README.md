@@ -14,19 +14,25 @@ Light latte palette (`colors.toml`), borderless cards (`border-width = 0`
 across popups/menu/notifications), and soft compositor-independent card
 shadows (`shell.shadow.toml` — foreground-tinted, 0.33 opacity, 32px blur).
 
-## Shadows need the shell patch
+## Setup (everything a theme install can't carry)
 
-`shell.shadow.toml` is read by a small patch to omarchy-shell
-(`BorderSurface` + `Style` + card opt-ins). Stock Omarchy ignores it and the
-theme renders flat — still fine, just less soft. To get shadows, apply the
-patch from this repo's companion scripts (requires the Omarchy source tree):
+`omarchy theme install` only stages theme files. Barista behavior that lives
+elsewhere — the shell shadow patch, hypr window chrome — comes via `setup/`:
 
 ```
-sudo ./shadow-patch/apply-shadows.sh
-omarchy restart shell
+./setup.sh                    # everything (asks sudo for system steps only)
+./setup.sh --step hypr-chrome # one step
+./setup.sh --revert           # undo everything, reverse order
+omarchy restart shell && hyprctl reload
 ```
 
-Revert anytime with `sudo ./shadow-patch/revert-shadows.sh`.
+| Step | What | Where |
+|------|------|-------|
+| `shell-shadows` | QML card shadows (`BorderSurface` + `Style` + card opt-ins + template default) | `/usr/share/omarchy` (sudo) |
+| `hypr-chrome` | single-window-no-border + bar-aware gaps | `~/.config/hypr/` |
+
+Without setup the theme still works — flat cards, stock borders. Shadows and
+window chrome are the soft part.
 
 ## Fonts
 

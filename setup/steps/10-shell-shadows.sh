@@ -1,13 +1,27 @@
 #!/bin/bash
-# Applies in-shell QML shadows to omarchy-shell (option 2).
+# Step 10 — shell-shadows: compositor-independent card shadows in omarchy-shell.
 # Design: BorderSurface gains opt-in `shadow` (default false) + theme tokens
 # on Style ([shadow] in shell.toml). Only top-level cards opt in; all nested
 # controls, bar slabs, rows, tooltips stay flat automatically.
-# Usage: sudo ./apply-shadows.sh   (backs up every file to <file>.bak-shadow1)
+# System files: must run as root (sudo). Backs up every file to *.bak-barista1.
+# Idempotent: skips hunks already applied. Usage: $0 [apply|revert].
 set -euo pipefail
 SHELL_DIR="/usr/share/omarchy/shell"
 THEME_TPL="/usr/share/omarchy/default/themed/shell.toml.tpl"
-bak() { cp -n "$1" "$1.bak-shadow1" 2>/dev/null || true; }
+BAK_SUFFIX=".bak-barista1"
+bak() { cp -n "$1" "$1$BAK_SUFFIX" 2>/dev/null || true; }
+
+MODE="${1:-apply}"
+if [[ "$MODE" == "revert" ]]; then
+  n=0
+  for f in $(find "$SHELL_DIR" /usr/share/omarchy/default/themed -name "*$BAK_SUFFIX" 2>/dev/null); do
+    mv "$f" "${f%$BAK_SUFFIX}"; n=$((n+1)); echo "shell-shadows: restored ${f%$BAK_SUFFIX}"
+  done
+  echo "shell-shadows: reverted $n files"
+  exit 0
+fi
+[[ "$MODE" == "apply" ]] || { echo "usage: $0 [apply|revert]" >&2; exit 1; }
+if (( EUID != 0 )); then echo "shell-shadows: must run as root (sudo)" >&2; exit 1; fi
 
 echo "== 1. BorderSurface.qml (opt-in shadow plane) =="
 bak "$SHELL_DIR/Ui/BorderSurface.qml"
@@ -216,7 +230,7 @@ targets = {
 }
 for rel, idline in targets.items():
     p = SHELL/rel
-    bak = str(p) + '.bak-shadow1'
+    bak = str(p) + '.bak-barista1'
     pathlib.Path(bak).write_bytes(p.read_bytes()) if not pathlib.Path(bak).exists() else None
     lines = p.read_text().splitlines(keepends=True)
     out, done = [], False
@@ -248,4 +262,4 @@ if 'shadowMargin' not in src:
 else:
     print("Menu clamp already patched")
 EOF
-echo "done. backups: *.bak-shadow1"
+echo "shell-shadows: done."

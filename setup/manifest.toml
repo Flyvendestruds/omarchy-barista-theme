@@ -1,0 +1,12 @@
+# barista setup manifest: ordered steps, each idempotent with apply|revert.
+# setup.sh runs them in numeric order. To add a behavior: drop a new
+# NN-name.sh step here, register it below, no orchestrator changes needed.
+steps:
+  - id: shell-shadows
+    file: steps/10-shell-shadows.sh
+    needs_root: true
+    description: QML card shadows (BorderSurface + Style + card opt-ins + template default)
+  - id: hypr-chrome
+    file: steps/20-hypr-chrome.sh
+    needs_root: false
+    description: single-window-no-border + bar-aware gaps lua + hyprland.lua requires
