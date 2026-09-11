@@ -18,3 +18,7 @@ steps:
     file: steps/40-theme-dev.sh
     needs_root: false
     description: live-edit loop (tokens-apply + watcher units, dev-only)
+  - id: update-hook
+    file: steps/50-update-hook.sh
+    needs_root: false
+    description: post-update repair (re-run shell-shadows + notify)
