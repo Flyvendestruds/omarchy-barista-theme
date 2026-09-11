@@ -342,13 +342,23 @@ else:
 EOF
 
 echo "== 8. User plugin overrides (~/.config/omarchy/plugins/barista.*) =="
-# First-party opt-ins above are dead weight when a user override shadows the
-# plugin: the override copy is what the shell actually loads. Mirror the
-# same hunks there. No sudo needed (user-owned), no backups (git is the
-# undo — these dirs are the user's own customizations).
-python3 - <<'EOF'
-import pathlib
-HOME = pathlib.Path.home()
+# User-owned: must run as the REAL user, not root. Under sudo, $HOME is
+# /root and the overrides are invisible (hence the old "no override, skip"
+# wall). Re-exec this hunk via runuser/su when root, else run directly.
+run_as_user() {
+  if (( EUID == 0 )) && [[ -n "${SUDO_USER:-}" ]]; then
+    runuser -u "$SUDO_USER" -- "$@"
+  elif (( EUID == 0 )); then
+    echo "hunk 8: running as root without SUDO_USER — overrides live in a user HOME I cannot see. Skipping." >&2
+    echo "hunk 8: re-run this step WITHOUT sudo (hunks 1-7,9 need it, this one doesn't)."
+    return 0
+  else
+    "$@"
+  fi
+}
+run_as_user python3 - <<'EOF'
+import pathlib, os
+HOME = pathlib.Path(os.path.expanduser("~"))
 OV = HOME/'.config/omarchy/plugins'
 # (override file, anchor id line) — same semantics as hunk 6
 targets = {
