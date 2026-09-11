@@ -10,13 +10,9 @@ if type(hl.get_workspaces) ~= "function" or type(hl.get_workspace_windows) ~= "f
   return
 end
 
--- Barista-gated: no-op unless barista is the active theme.
-do
-  local gate_ok, gate = pcall(require, "hypr.barista-gate")
-  if not gate_ok or not gate or not gate.active() then
-    return
-  end
-end
+-- Barista-gated: the handlers always stay registered (so they can undo
+-- on theme switch), but each pass decides via the gate whether to apply
+-- the single-window rule or restore stock borders.
 
 local function tiled_windows(ws_id)
   local out = {}
@@ -83,6 +79,38 @@ local function sync_all()
   end
 end
 
+-- Barista-gated sync: restores the theme border on every window when
+-- barista is NOT active (undoes border_size 0 left behind by a previous
+-- barista session), otherwise applies the single-window rule.
+local function gated_sync_all()
+  local gate_ok, gate = pcall(require, "hypr.barista-gate")
+  if gate_ok and gate and gate.active() then
+    pcall(sync_all)
+    return
+  end
+  -- Foreign theme: clear any per-window overrides this module set before.
+  -- A plain hl.config reload cannot do this: border_size was applied per
+  -- window via set_prop, which survives config changes until re-set.
+  local ok, workspaces = pcall(hl.get_workspaces)
+  if not ok or type(workspaces) ~= "table" then
+    return
+  end
+  local border = theme_border()
+  for _, ws in ipairs(workspaces) do
+    local ok_id, id = pcall(function()
+      return ws.id
+    end)
+    if ok_id and id ~= nil then
+      local ok_w, wins = pcall(hl.get_workspace_windows, id)
+      if ok_w and type(wins) == "table" then
+        for _, w in ipairs(wins) do
+          pcall(set_border, w, border)
+        end
+      end
+    end
+  end
+end
+
 -- Debounced sync: window/workspace events can fire before the window list
 -- settles, so coalesce rapid events into one delayed pass.
 local sync_pending = false
@@ -93,11 +121,11 @@ local function request_sync()
   sync_pending = true
   local ok = pcall(hl.timer, function()
     sync_pending = false
-    pcall(sync_all)
+    pcall(gated_sync_all)
   end, { timeout = 80, type = "oneshot" })
   if not ok then
     sync_pending = false
-    pcall(sync_all)
+    pcall(gated_sync_all)
   end
 end
 
@@ -115,5 +143,6 @@ hl.on("workspace.special_active", request_sync)
 hl.on("config.reloaded", request_sync)
 hl.on("hyprland.start", request_sync)
 
--- Initial pass for windows already open at (re)load.
-pcall(sync_all)
+-- Initial pass for windows already open at (re)load. Gated the same way:
+-- restores stock borders when arriving from another theme as well.
+pcall(gated_sync_all)
