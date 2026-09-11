@@ -340,7 +340,76 @@ if old in src:
 else:
     print("Menu clamp already patched")
 EOF
-echo "== 8. Style.qml (barista gap-following margins) =="
+
+echo "== 8. User plugin overrides (~/.config/omarchy/plugins/barista.*) =="
+# First-party opt-ins above are dead weight when a user override shadows the
+# plugin: the override copy is what the shell actually loads. Mirror the
+# same hunks there. No sudo needed (user-owned), no backups (git is the
+# undo — these dirs are the user's own customizations).
+python3 - <<'EOF'
+import pathlib
+HOME = pathlib.Path.home()
+OV = HOME/'.config/omarchy/plugins'
+# (override file, anchor id line) — same semantics as hunk 6
+targets = {
+    'barista.clipboard/Clipboard.qml': 'id: card',
+    'barista.emojis/Emojis.qml': 'id: card',
+    'barista.polkit/PolkitAgent.qml': 'id: card',
+    'barista.reminders/ReminderFlow.qml': 'id: card',
+    'barista.notifications/components/NotificationCard.qml': 'id: root',
+}
+for rel, idline in targets.items():
+    p = OV/rel
+    if not p.exists():
+        print(f"no override, skip: {rel}")
+        continue
+    lines = p.read_text().splitlines(keepends=True)
+    opted = False
+    for i, ln in enumerate(lines):
+        if ln.strip() == idline and 'shadow' in ''.join(lines[i+1:i+6]):
+            opted = True
+            break
+    if opted:
+        print(f"already opted in: {rel}")
+        continue
+    out, done = [], False
+    for i, ln in enumerate(lines):
+        out.append(ln)
+        if not done and ln.strip() == idline:
+            if 'shadow' not in ''.join(lines[i+1:i+6]):
+                ind = ln[:len(ln)-len(ln.lstrip())]
+                out.append(f'{ind}shadow: true\n')
+                done = True
+    if not done:
+        print(f"SKIP {rel}: id line not found (customized beyond recognition?)")
+        continue
+    p.write_text(''.join(out))
+    print(f"opted in: {rel}")
+
+# OSD override: margin + opt-in (mirrors hunk 5)
+p = OV/'barista.osd/Osd.qml'
+if p.exists():
+    src = p.read_text()
+    changed = False
+    old = '      anchors.bottomMargin: Style.space(67)\n'
+    if old in src and 'Style.shadowMargin' not in src:
+        src = src.replace(old, '      anchors.bottomMargin: Style.space(67) + Style.shadowMargin\n', 1)
+        changed = True
+    old = '''    BorderSurface {
+      id: card
+'''
+    if old in src and 'shadow: true' not in src:
+        src = src.replace(old, '''    BorderSurface {
+      id: card
+      shadow: true
+''', 1)
+        changed = True
+    p.write_text(src)
+    print("OSD override patched" if changed else "OSD override already patched")
+else:
+    print("no override, skip: barista.osd/Osd.qml")
+EOF
+echo "== 9. Style.qml (barista gap-following margins) =="
 # Half of the effective Hyprland gaps_out, refreshed live — notifications,
 # menus, popups and OSD all anchor off Style.gapsOut, so one value moves
 # every shell surface at once. Stock gap math (half) is kept.
