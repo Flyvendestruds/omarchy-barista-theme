@@ -2,7 +2,7 @@
 enabled = true
 color = "#4c4f69"
 opacity = 0.33
-blur = 32
+blur = 0.9
 spread = 0
 offset-x = 0
 offset-y = 6
