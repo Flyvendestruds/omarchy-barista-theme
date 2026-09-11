@@ -214,37 +214,43 @@ python3 - <<'EOF'
 import pathlib
 p = pathlib.Path('/usr/share/omarchy/shell/Ui/PopupCard.qml')
 src = p.read_text()
-assert 'shadowMargin' not in src, "already patched?"
+changed = False
 old = '''  property int margin: Style.gapsOut
 '''
-assert old in src
-src = src.replace(old, '''  property int margin: Style.gapsOut
+new = '''  property int margin: Style.gapsOut
   // Transparent bleed around the card so the shadow never clips at the
   // window edge. The window grows with it, so anchor math stays consistent.
   readonly property int cardBleed: Style.shadowMargin
-''', 1)
+'''
+if old in src and 'readonly property int cardBleed' not in src:
+    src = src.replace(old, new, 1)
+    changed = True
 old = '''  implicitWidth: contentWidth
   implicitHeight: contentHeight
 '''
-assert old in src
-src = src.replace(old, '''  implicitWidth: contentWidth + cardBleed * 2
+new = '''  implicitWidth: contentWidth + cardBleed * 2
   implicitHeight: contentHeight + cardBleed * 2
-''', 1)
+'''
+if old in src:
+    src = src.replace(old, new, 1)
+    changed = True
 old = '''  BorderSurface {
     id: card
     anchors.fill: parent
     color: Color.popups.background
 '''
-assert old in src
-src = src.replace(old, '''  BorderSurface {
+new = '''  BorderSurface {
     id: card
     anchors.fill: parent
     anchors.margins: cardBleed
     shadow: true
     color: Color.popups.background
-''', 1)
+'''
+if old in src:
+    src = src.replace(old, new, 1)
+    changed = True
 p.write_text(src)
-print("PopupCard patched")
+print("PopupCard patched" if changed else "PopupCard already patched")
 EOF
 
 echo "== 5. OSD (margin + opt in) =="
@@ -253,21 +259,24 @@ python3 - <<'EOF'
 import pathlib
 p = pathlib.Path('/usr/share/omarchy/shell/plugins/osd/Osd.qml')
 src = p.read_text()
+changed = False
 old = '      anchors.bottomMargin: Style.space(67)\n'
-assert old in src, "osd margin not found"
-if 'Style.shadowMargin' not in src:
+if old in src and 'Style.shadowMargin' not in src:
     src = src.replace(old, '      anchors.bottomMargin: Style.space(67) + Style.shadowMargin\n', 1)
+    changed = True
 old = '''    BorderSurface {
       id: card
 '''
-assert old in src
-if 'shadow: true' not in src:
-    src = src.replace(old, '''    BorderSurface {
+new = '''    BorderSurface {
       id: card
       shadow: true
-''', 1)
+'''
+if old in src and 'shadow: true' not in src.split(old)[0][-200:]:
+    # only insert if this specific block lacks it
+    src = src.replace(old, new, 1)
+    changed = True
 p.write_text(src)
-print("OSD patched")
+print("OSD patched" if changed else "OSD already patched")
 EOF
 
 echo "== 6. Opt in top-level cards (menu, clipboard, emojis, keyboard, polkit, reminders, dialog, lock, notifications) =="
@@ -291,6 +300,16 @@ for rel, idline in targets.items():
     bak = str(p) + '.bak-barista1'
     pathlib.Path(bak).write_bytes(p.read_bytes()) if not pathlib.Path(bak).exists() else None
     lines = p.read_text().splitlines(keepends=True)
+    # already opted in? the shadow prop follows the id line within a few lines
+    opted = False
+    for i, ln in enumerate(lines):
+        if ln.strip() == idline:
+            if 'shadow' in ''.join(lines[i+1:i+6]):
+                opted = True
+                break
+    if opted:
+        print(f"already opted in: {rel}")
+        continue
     out, done = [], False
     for i, ln in enumerate(lines):
         out.append(ln)
@@ -300,7 +319,9 @@ for rel, idline in targets.items():
                 ind = ln[:len(ln)-len(ln.lstrip())]
                 out.append(f'{ind}shadow: true\n')
                 done = True
-    assert done, f"no block opted in for {rel}"
+    if not done:
+        print(f"SKIP {rel}: id line not found (upstream changed?)")
+        continue
     p.write_text(''.join(out))
     print(f"opted in: {rel}")
 EOF
@@ -311,10 +332,9 @@ import pathlib
 p = pathlib.Path('/usr/share/omarchy/shell/plugins/menu/Menu.qml')
 src = p.read_text()
 old = 'height: Math.min(root.cardHeight, panel.height - Style.gapsOut - panel.effectiveCardTop)'
-assert old in src, "menu height expr not found"
-if 'shadowMargin' not in src:
-    src = src.replace(old,
-        'height: Math.min(root.cardHeight, panel.height - Style.gapsOut - Style.shadowMargin - panel.effectiveCardTop)', 1)
+new = 'height: Math.min(root.cardHeight, panel.height - Style.gapsOut - Style.shadowMargin - panel.effectiveCardTop)'
+if old in src:
+    src = src.replace(old, new, 1)
     p.write_text(src)
     print("Menu clamp patched")
 else:
