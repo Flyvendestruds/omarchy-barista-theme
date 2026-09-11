@@ -1,7 +1,16 @@
 #!/bin/bash
-# Theme-independent: re-apply the bar-side gap after any theme change.
-# (bar_gap.lua already applies this on the `hyprctl reload` that theme-set
-# triggers; this re-applies it live in case the shell applied late.)
-# Intentionally does NOT force transparency: that is the user's setting in
-# shell.json (bar.transparent), independent of which theme is active.
-~/.local/bin/barista-bar-gap-sync >/dev/null 2>&1 &
+# Barista-only: start the gap watcher when the barista theme is set,
+# stop it for any other theme.
+# omarchy-hook passes the theme name as $1 (omarchy-theme-set line 341).
+# The post-boot hook + bar_gap.lua cover hypr loads; this covers live
+# theme switches without reboot.
+THEME="${1:-}"
+BIN="$HOME/.local/bin/barista-bar-gap-sync"
+UNIT="barista-bar-gap-watcher.service"
+
+if [[ "$THEME" == "barista" ]]; then
+  systemctl --user enable --now "$UNIT" >/dev/null 2>&1 || true
+  "$BIN" >/dev/null 2>&1 &
+else
+  systemctl --user disable --now "$UNIT" >/dev/null 2>&1 || true
+fi

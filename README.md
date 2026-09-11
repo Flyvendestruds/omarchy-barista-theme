@@ -30,7 +30,7 @@ omarchy restart shell && hyprctl reload
 |------|------|-------|
 | `shell-shadows` | QML card shadows (`BorderSurface` + `Style` + card opt-ins + template default) | `/usr/share/omarchy` (sudo) |
 | `hypr-chrome` | single-window-no-border + bar-aware gaps lua | `~/.config/hypr/` |
-| `bar-gap` | live gap sync when bar transparency changes (watcher service + boot/theme hooks) | `~/.local/bin`, user systemd, hooks |
+| `bar-gap` | live gap sync when bar transparency changes; runs only while barista is active (theme-set/post-boot gates) | `~/.local/bin`, user systemd, hooks |
 
 Without setup the theme still works — flat cards, stock borders. Shadows and
 window chrome are the soft part.

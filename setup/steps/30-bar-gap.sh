@@ -49,7 +49,12 @@ do_apply() {
   install_file "$FILES/systemd/barista-bar-gap-watcher.service" "$UNIT_DIR/$SERVICE"
   install_file "$FILES/hooks/bar-gap-sync.hook" "$HOOK_BOOT_DIR/bar-gap-sync.hook" exec
   install_file "$FILES/hooks/theme-set-bar-gap-sync.hook" "$HOOK_THEME_DIR/bar-gap-sync.hook" exec
-  manage_unit apply
+  if [[ "$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)" == "barista" ]]; then
+    manage_unit apply
+  else
+    systemctl --user disable --now "$SERVICE" >/dev/null 2>&1 || true
+    echo "bar-gap: installed but not started (theme is not barista)"
+  fi
   # legacy names from before the barista rename: stop+disable, leave files
   if systemctl --user is-enabled omarchy-bar-gap-watcher.service >/dev/null 2>&1; then
     systemctl --user disable --now omarchy-bar-gap-watcher.service >/dev/null 2>&1 || true
