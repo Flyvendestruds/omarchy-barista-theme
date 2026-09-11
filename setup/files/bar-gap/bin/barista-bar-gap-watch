@@ -1,17 +1,20 @@
 #!/bin/bash
-# Watch shell.json for bar transparency/position changes and sync the
-# Hyprland bar-side gap. Watches the DIRECTORY (not the file) because
-# omarchy-bar rewrites shell.json atomically (tmp + mv), which swaps the
-# inode and silently detaches a file-level inotify watch.
-# Debounced + state-hashed: rapid churn (reminders snapshot, widget state,
-# multi-write toggles) only triggers hyprctl when transparent/position
-# actually changed.
+# Watch for gap-relevant changes and sync:
+#  1. shell.json transparency/position writes (inotify on the directory —
+#     omarchy-bar rewrites shell.json atomically via tmp + mv, which swaps
+#     the inode and silently detaches a file-level watch). Debounced +
+#     state-hashed so reminders/widget churn doesn't trigger hyprctl.
+#  2. Hyprland gaps_out edits made outside this script (looknfeel tweaks,
+#     `hyprctl` experiments): polled every 3s with a full sync. The sync
+#     derives its base from the live non-bar sides, so it adopts the new
+#     size while re-applying the bar-side rule — converging in one extra
+#     pass (sync is idempotent: same gaps in, same gaps out).
 
 set -u
 
 CONFIG="$HOME/.config/omarchy/shell.json"
 DIR="$(dirname "$CONFIG")"
-BASE="$(basename "$CONFIG")"
+BASE_F="$(basename "$CONFIG")"
 SYNC="$HOME/.local/bin/barista-bar-gap-sync"
 
 bar_state() {
@@ -25,14 +28,43 @@ except Exception:
 " 2>/dev/null
 }
 
-LAST="$(bar_state)"
+hypr_css() {
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    hyprctl -j getoption general:gaps_out 2>/dev/null
+  else
+    hyprctl -i 0 -j getoption general:gaps_out 2>/dev/null
+  fi | python3 -c "
+import json, sys
+try:
+    print(json.load(sys.stdin).get('css', ''))
+except Exception:
+    pass
+" 2>/dev/null
+}
 
+LAST_BAR="$(bar_state)"
+LAST_HYPR="$(hypr_css)"
+
+# inotify stream in the background; hypr poll in the foreground loop.
 inotifywait -m -e close_write,moved_to,create --format "%e %f" "$DIR" 2>/dev/null | while read -r events file; do
-  [[ "$file" == "$BASE" ]] || continue
+  [[ "$file" == "$BASE_F" ]] || continue
   sleep 0.2
   STATE="$(bar_state)"
-  if [[ -n "$STATE" && "$STATE" != "UNKNOWN" && "$STATE" != "$LAST" ]]; then
-    LAST="$STATE"
+  if [[ -n "$STATE" && "$STATE" != "UNKNOWN" && "$STATE" != "$LAST_BAR" ]]; then
+    LAST_BAR="$STATE"
     "$SYNC" >/dev/null 2>&1
+    LAST_HYPR="$(hypr_css)"
+  fi
+done &
+INOTIFY_PID=$!
+
+trap 'kill "$INOTIFY_PID" 2>/dev/null; exit 0' INT TERM EXIT
+
+while sleep 3; do
+  CSS="$(hypr_css)"
+  if [[ -n "$CSS" && "$CSS" != "$LAST_HYPR" ]]; then
+    LAST_HYPR="$CSS"
+    "$SYNC" >/dev/null 2>&1
+    LAST_HYPR="$(hypr_css)"
   fi
 done

@@ -1,12 +1,9 @@
 -- Bar-aware top gap: reads ~/.config/omarchy/shell.json on every reload.
--- transparent bar  -> gaps_out top = 0 (bar floats over wallpaper)
--- solid bar        -> gaps_out top = 6
--- Honors bar.position: applies the gap on the bar side only, keeps
--- other sides on the theme default (BASE_GAPS_OUT).
--- This file loads AFTER hypr.my_theme_gen (see hyprland.lua order), so it
--- always wins over generated theme gaps on reload / theme switch / reboot.
--- No dependency on my_theme_gen: BASE_GAPS_OUT default matches your current
--- barista theme (6); adjust if your theme default changes.
+-- transparent bar  -> gaps_out on the bar side = 0 (bar floats over wallpaper)
+-- solid bar        -> gaps_out on the bar side = your live gap size
+-- Honors bar.position: applies the zero on the bar side only, keeps
+-- your other sides as they are (read live from Hyprland, never a
+-- hardcoded constant, so manual tweaks survive reloads).
 
 -- Barista-gated: no-op unless barista is the active theme (see
 -- barista-gate.lua). Other themes keep Omarchy stock gaps.
@@ -18,8 +15,10 @@ do
 end
 
 local BAR_GAP_TRANSPARENT = 0
-local BAR_GAP_SOLID = 6
-local BASE_GAPS_OUT = 6
+-- Non-bar side default when the live value is unreadable (first boot
+-- before any gaps_out exists). Otherwise the base comes from Hyprland
+-- itself (see live_base below), so manual tweaks survive reloads.
+local FALLBACK_BASE = 6
 
 local function read_shell_config()
   local path = (os.getenv("HOME") or "") .. "/.config/omarchy/shell.json"
@@ -37,13 +36,62 @@ local function read_shell_config()
 end
 
 local bar = read_shell_config() or { transparent = true, position = "top" }
-local edge_gap = bar.transparent and BAR_GAP_TRANSPARENT or BAR_GAP_SOLID
+
+-- Base = live gaps_out with the bar side excluded, so a manual size set
+-- in looknfeel (or via hyprctl) sticks across reloads instead of being
+-- reset to a hardcoded constant. get_config returns either a scalar
+-- ("6") or a css-style side string ("0 6 6 6", order T R B L).
+-- NOTE: files that load AFTER this one (default.hypr.toggles, user config
+-- below the requires) overwrite gaps_out wholesale — this file can only
+-- preserve sizes set by EARLIER files (omarchy defaults, looknfeel).
+local function live_base(position)
+  local ok, v = pcall(hl.get_config, "general.gaps_out")
+  local sides = {}
+  if ok and v ~= nil then
+    if type(v) == "table" then
+      for _, k in ipairs({ "top", "right", "bottom", "left" }) do
+        local n = tonumber(v[k] or v[string.sub(k, 1, 1)])
+        if n ~= nil and n >= 0 then
+          sides[k] = n
+        end
+      end
+    else
+      local nums = {}
+      for num in tostring(v):gmatch("-?%d+%.?%d*") do
+        local n = tonumber(num)
+        if n ~= nil and n >= 0 then
+          table.insert(nums, n)
+        end
+      end
+      local keys = { "top", "right", "bottom", "left" }
+      if #nums == 1 then
+        for _, k in ipairs(keys) do
+          sides[k] = nums[1]
+        end
+      elseif #nums == 4 then
+        for i, k in ipairs(keys) do
+          sides[k] = nums[i]
+        end
+      end
+    end
+  end
+  local peak = nil
+  for k, n in pairs(sides) do
+    if k ~= position and (peak == nil or n > peak) then
+      peak = n
+    end
+  end
+  return peak or FALLBACK_BASE
+end
+
+local base = live_base(bar.position)
+local edge_gap = bar.transparent and BAR_GAP_TRANSPARENT or base
 
 local gaps_out = {
-  top = BASE_GAPS_OUT,
-  right = BASE_GAPS_OUT,
-  bottom = BASE_GAPS_OUT,
-  left = BASE_GAPS_OUT,
+  top = base,
+  right = base,
+  bottom = base,
+  left = base,
 }
 
 if bar.position == "top" then

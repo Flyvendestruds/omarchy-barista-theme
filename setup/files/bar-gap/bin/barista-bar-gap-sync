@@ -1,17 +1,19 @@
 #!/bin/bash
 # Sync the bar-side Hyprland gap with the bar transparency state.
+# The OTHER sides follow your live Hyprland gap size — nothing is
+# hardcoded: BASE is read from the current effective gaps_out on every
+# run, so manual `hyprctl` edits and looknfeel changes stick.
 # transparent bar -> gaps_out on the bar side = 0
-# solid bar      -> gaps_out on the bar side = 6
-# Other sides stay on BASE (6 = current barista/my-theme default).
-# Triggered by: systemd path unit (shell.json writes), theme-set and
-# post-boot hooks. Idempotent and safe to run any time Hyprland is up.
+# solid bar      -> gaps_out on the bar side = BASE
+# Triggered by: systemd watcher (shell.json writes + hypr poll), theme-set
+# and post-boot hooks. Idempotent and safe to run any time Hyprland is up.
 
 set -u
 
 CONFIG="$HOME/.config/omarchy/shell.json"
-BASE=6
-GAP_TRANSPARENT=0
-GAP_SOLID=6
+STATE_DIR="$HOME/.local/state/omarchy/barista"
+STATE_FILE="$STATE_DIR/gaps_out"
+FALLBACK_BASE=6
 
 command -v hyprctl >/dev/null 2>&1 || exit 0
 [[ "${XDG_RUNTIME_DIR:-}" != "" ]] || export XDG_RUNTIME_DIR="/run/user/$(id -u)"
@@ -24,7 +26,48 @@ hyprctl_cmd() {
     hyprctl -i 0 "$@"
   fi
 }
-hyprctl_cmd instances >/dev/null 2>&1 || exit 0
+hypr_up() { hyprctl_cmd instances >/dev/null 2>&1; }
+
+# Live gaps_out css ("T R B L") from Hyprland; empty when unreachable.
+live_css() {
+  hyprctl_cmd -j getoption general:gaps_out 2>/dev/null | python3 -c "
+import json, sys
+try:
+    print(json.load(sys.stdin).get('css', ''))
+except Exception:
+    pass
+" 2>/dev/null
+}
+
+current_theme() {
+  local t
+  t="$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+  [[ -n "$t" ]] && echo "$t" || echo unknown
+}
+
+publish_state() { # T R B L
+  mkdir -p "$STATE_DIR" 2>/dev/null || true
+  printf '%s %s %s %s\n%s\n' "$1" "$2" "$3" "$4" "$(current_theme)" > "$STATE_FILE" 2>/dev/null || true
+}
+
+# Print the four integer sides of a css string, or nothing when unparsable.
+parse_css() { # css
+  python3 -c "
+import re, sys
+parts = re.findall(r'-?\d+(?:\.\d+)?', sys.argv[1] if len(sys.argv) > 1 else '')
+vals = []
+for x in parts[:4]:
+    try:
+        v = int(float(x))
+    except Exception:
+        break
+    if v < 0:
+        break
+    vals.append(v)
+if len(vals) == 4:
+    print(' '.join(map(str, vals)))
+" "$1" 2>/dev/null
+}
 
 TRANSPARENT="true"
 POSITION="top"
@@ -42,10 +85,36 @@ except Exception:
 " 2>/dev/null) || { TRANSPARENT="true"; POSITION="top"; }
 fi
 
-if [[ $TRANSPARENT == "true" ]]; then
-  EDGE=$GAP_TRANSPARENT
+# BASE = biggest non-bar side of the live gaps (manual sizes survive).
+# Falls back to the last published state, then to FALLBACK_BASE.
+BASE="$FALLBACK_BASE"
+sides="$(parse_css "$(live_css)")"
+if [[ -n "$sides" ]]; then
+  read -r LT RT BT LL < <(echo "$sides")
+  case "$POSITION" in
+    top)    BASE=$(printf '%s\n' "$RT" "$BT" "$LL" | sort -n | tail -1) ;;
+    bottom) BASE=$(printf '%s\n' "$LT" "$RT" "$LL" | sort -n | tail -1) ;;
+    left)   BASE=$(printf '%s\n' "$LT" "$RT" "$BT" | sort -n | tail -1) ;;
+    right)  BASE=$(printf '%s\n' "$LT" "$BT" "$LL" | sort -n | tail -1) ;;
+  esac
 else
-  EDGE=$GAP_SOLID
+  state_sides="$(parse_css "$(head -n 1 "$STATE_FILE" 2>/dev/null)")"
+  if [[ -n "$state_sides" ]]; then
+    read -r LT RT BT LL < <(echo "$state_sides")
+    case "$POSITION" in
+      top)    BASE=$(printf '%s\n' "$RT" "$BT" "$LL" | sort -n | tail -1) ;;
+      bottom) BASE=$(printf '%s\n' "$LT" "$RT" "$LL" | sort -n | tail -1) ;;
+      left)   BASE=$(printf '%s\n' "$LT" "$RT" "$BT" | sort -n | tail -1) ;;
+      right)  BASE=$(printf '%s\n' "$LT" "$BT" "$LL" | sort -n | tail -1) ;;
+    esac
+  fi
+fi
+[[ "$BASE" =~ ^[0-9]+$ ]] || BASE="$FALLBACK_BASE"
+
+if [[ $TRANSPARENT == "true" ]]; then
+  EDGE=0
+else
+  EDGE=$BASE
 fi
 
 TOP=$BASE; RIGHT=$BASE; BOTTOM=$BASE; LEFT=$BASE
@@ -56,15 +125,14 @@ case "$POSITION" in
   right) RIGHT=$EDGE ;;
 esac
 
-hyprctl_cmd eval "hl.config({general={gaps_out={top=$TOP,right=$RIGHT,bottom=$BOTTOM,left=$LEFT}}})" >/dev/null 2>&1
+if hypr_up; then
+  hyprctl_cmd eval "hl.config({general={gaps_out={top=$TOP,right=$RIGHT,bottom=$BOTTOM,left=$LEFT}}})" >/dev/null 2>&1
+fi
 
 # Publish the effective gaps + active theme for the shell's gap-following
 # margins (step 10, Style.qml section 8). The shell has no theme concept
 # and no Hyprland event stream for live `hyprctl keyword` / hl.config()
 # edits, so this state file is its clock: line 1 = css "T R B L",
-# line 2 = theme name (barista?). Written on every sync even when Hyprland
-# is down, so theme switches without a compositor round-trip still land.
-STATE_DIR="$HOME/.local/state/omarchy/barista"
-mkdir -p "$STATE_DIR" 2>/dev/null || true
-THEME="$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
-printf '%s %s %s %s\n%s\n' "$TOP" "$RIGHT" "$BOTTOM" "$LEFT" "${THEME:-unknown}" > "$STATE_DIR/gaps_out" 2>/dev/null || true
+# line 2 = theme name (barista?). Always written, even when Hyprland is
+# down, so theme switches without a compositor round-trip still land.
+publish_state "$TOP" "$RIGHT" "$BOTTOM" "$LEFT"

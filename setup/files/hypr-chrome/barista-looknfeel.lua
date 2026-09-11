@@ -34,6 +34,10 @@ hl.config({
   general = {
     border_size = 2,
     gaps_in = 3,
+    -- gaps_out scalar: reload entry point only. bar_gap.lua (loaded after
+    -- this file) immediately replaces it with the live per-side value
+    -- (your size on non-bar sides, 0/solid-size on the bar side), so this
+    -- number never sticks — edit freely, it takes effect on reload.
     gaps_out = 6,
     layout = "dwindle",
   },
