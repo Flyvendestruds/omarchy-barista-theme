@@ -9,11 +9,12 @@
 set -euo pipefail
 SETUP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-STEPS_ORDER=(shell-shadows hypr-chrome bar-gap)
+STEPS_ORDER=(shell-shadows hypr-chrome bar-gap theme-dev)
 step_file() { case "$1" in
   shell-shadows) echo "$SETUP_ROOT/steps/10-shell-shadows.sh";;
   hypr-chrome)   echo "$SETUP_ROOT/steps/20-hypr-chrome.sh";;
   bar-gap)       echo "$SETUP_ROOT/steps/30-bar-gap.sh";;
+  theme-dev)     echo "$SETUP_ROOT/steps/40-theme-dev.sh";;
   *) echo "unknown step: $1" >&2; exit 1;;
 esac; }
 step_needs_root() { [[ "$1" == "shell-shadows" ]]; }
@@ -31,7 +32,7 @@ done
 
 STEPS=()
 if [[ -n "$ONLY" ]]; then STEPS=("$ONLY")
-elif [[ "$MODE" == "revert" ]]; then STEPS=(bar-gap hypr-chrome shell-shadows)
+elif [[ "$MODE" == "revert" ]]; then STEPS=(theme-dev bar-gap hypr-chrome shell-shadows)
 else STEPS=("${STEPS_ORDER[@]}"); fi
 
 for step in "${STEPS[@]}"; do

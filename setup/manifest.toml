@@ -14,3 +14,7 @@ steps:
     file: steps/30-bar-gap.sh
     needs_root: false
     description: bar transparency gap watcher (bin scripts + user service + boot/theme hooks)
+  - id: theme-dev
+    file: steps/40-theme-dev.sh
+    needs_root: false
+    description: live-edit loop (tokens-apply + watcher units, dev-only)

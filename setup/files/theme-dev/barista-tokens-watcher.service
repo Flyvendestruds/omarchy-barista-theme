@@ -1,0 +1,6 @@
+[Unit]
+Description=Live-apply barista theme tokens on save
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/barista-tokens-apply

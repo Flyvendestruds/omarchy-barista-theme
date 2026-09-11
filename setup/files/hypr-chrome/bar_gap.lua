@@ -8,6 +8,15 @@
 -- No dependency on my_theme_gen: BASE_GAPS_OUT default matches your current
 -- barista theme (6); adjust if your theme default changes.
 
+-- Barista-gated: no-op unless barista is the active theme (see
+-- barista-gate.lua). Other themes keep Omarchy stock gaps.
+do
+  local gate_ok, gate = pcall(require, "hypr.barista-gate")
+  if not gate_ok or not gate or not gate.active() then
+    return
+  end
+end
+
 local BAR_GAP_TRANSPARENT = 0
 local BAR_GAP_SOLID = 6
 local BASE_GAPS_OUT = 6

@@ -1,0 +1,45 @@
+#!/bin/bash
+# barista-tokens-apply: live-apply ~/.config/omarchy/themes/barista/ edits.
+# Regenerates shell.toml from colors.toml + shell.*.toml overrides (same
+# pipeline `omarchy theme set` uses) and pushes it to the running shell.
+# Triggered by barista-tokens-watcher.path on save; safe to run by hand.
+set -euo pipefail
+
+THEME_DIR="$HOME/.config/omarchy/themes/barista"
+CURRENT="$HOME/.local/state/omarchy/current/theme"
+STAGE="$HOME/.local/state/omarchy/current/next-theme"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/omarchy-theme-set.lock"
+
+# Serialize against `omarchy theme set` (same lock file, shared staging dir).
+exec 9>"$LOCK"
+flock -w 10 9
+
+[[ -f $THEME_DIR/colors.toml ]] || { echo "barista-tokens-apply: no colors.toml in $THEME_DIR" >&2; exit 1; }
+
+# Stage: colors + section overrides, then run the stock template renderer.
+# It bakes shell.toml from default/themed/shell.toml.tpl and swaps each
+# [section] with shell.<section>.toml.
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+cp "$THEME_DIR/colors.toml" "$STAGE/colors.toml"
+shopt -s nullglob
+for f in "$THEME_DIR"/shell.*.toml; do
+  [[ $(basename "$f") != "shell.toml" ]] || continue
+  cp "$f" "$STAGE/"
+done
+
+omarchy-theme-set-templates
+
+[[ -f $STAGE/shell.toml ]] || { echo "barista-tokens-apply: template render produced no shell.toml" >&2; exit 1; }
+
+# Publish: colors (if changed) + shell into the live theme dir.
+cp "$THEME_DIR/colors.toml" "$CURRENT/colors.toml"
+cp "$STAGE/shell.toml" "$CURRENT/shell.toml"
+rm -rf "$STAGE"
+
+colors_payload=$(base64 -w 0 "$CURRENT/colors.toml")
+shell_payload=$(base64 -w 0 "$CURRENT/shell.toml")
+timeout 2 omarchy-shell shell applyTheme "$colors_payload" "$shell_payload" >/dev/null 2>&1 \
+  || echo "barista-tokens-apply: shell IPC failed (shell keeps previous values)" >&2
+
+echo "barista-tokens-apply: shell updated from $THEME_DIR"

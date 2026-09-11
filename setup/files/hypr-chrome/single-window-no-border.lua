@@ -10,6 +10,14 @@ if type(hl.get_workspaces) ~= "function" or type(hl.get_workspace_windows) ~= "f
   return
 end
 
+-- Barista-gated: no-op unless barista is the active theme.
+do
+  local gate_ok, gate = pcall(require, "hypr.barista-gate")
+  if not gate_ok or not gate or not gate.active() then
+    return
+  end
+end
+
 local function tiled_windows(ws_id)
   local out = {}
   local ok, wins = pcall(hl.get_workspace_windows, ws_id)

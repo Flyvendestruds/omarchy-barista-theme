@@ -1,0 +1,22 @@
+[Unit]
+Description=Watch barista theme tokens for changes
+
+[Path]
+PathChanged=%h/.config/omarchy/themes/barista/colors.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.bar.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.hyprland.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.controls.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.spacing.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.font.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.popups.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.tooltip.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.notifications.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.launcher.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.menu.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.polkit.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.lock.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.image-picker.toml
+PathChanged=%h/.config/omarchy/themes/barista/shell.shadow.toml
+
+[Install]
+WantedBy=paths.target

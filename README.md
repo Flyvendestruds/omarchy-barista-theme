@@ -29,8 +29,21 @@ omarchy restart shell && hyprctl reload
 | Step | What | Where |
 |------|------|-------|
 | `shell-shadows` | QML card shadows (`BorderSurface` + `Style` + card opt-ins + template default) | `/usr/share/omarchy` (sudo) |
-| `hypr-chrome` | single-window-no-border + bar-aware gaps lua | `~/.config/hypr/` |
+| `hypr-chrome` | gated looknfeel (rounding/gaps/borders, replaces `my_theme_gen`) + single-window borders + bar-aware gaps | `~/.config/hypr/` |
 | `bar-gap` | live gap sync when bar transparency changes; runs only while barista is active (theme-set/post-boot gates) | `~/.local/bin`, user systemd, hooks |
+| `theme-dev` | live-edit loop (`barista-tokens-apply` + watcher units). Dev-only, skip on fresh machines | `~/.local/bin`, user systemd |
+
+Without setup the theme still works — flat cards, stock borders. Shadows and
+window chrome are the soft part.
+
+## Hacking on barista
+
+Theme files live at the repo root (`colors.toml`, `shell.*.toml`). Push them
+live with `./setup/sync-theme.sh` (copies into
+`~/.config/omarchy/themes/barista/`); the tokens watcher re-renders
+`shell.toml` and pushes it to the running shell on every save. Hypr chrome
+lives in `setup/files/hypr-chrome/` — edit there, re-run
+`./setup.sh --step hypr-chrome`, `hyprctl reload` to preview.
 
 Without setup the theme still works — flat cards, stock borders. Shadows and
 window chrome are the soft part.
