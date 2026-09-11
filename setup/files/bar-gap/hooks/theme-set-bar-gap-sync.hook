@@ -1,0 +1,7 @@
+#!/bin/bash
+# Theme-independent: re-apply the bar-side gap after any theme change.
+# (bar_gap.lua already applies this on the `hyprctl reload` that theme-set
+# triggers; this re-applies it live in case the shell applied late.)
+# Intentionally does NOT force transparency: that is the user's setting in
+# shell.json (bar.transparent), independent of which theme is active.
+~/.local/bin/barista-bar-gap-sync >/dev/null 2>&1 &

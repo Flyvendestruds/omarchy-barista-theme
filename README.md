@@ -29,7 +29,8 @@ omarchy restart shell && hyprctl reload
 | Step | What | Where |
 |------|------|-------|
 | `shell-shadows` | QML card shadows (`BorderSurface` + `Style` + card opt-ins + template default) | `/usr/share/omarchy` (sudo) |
-| `hypr-chrome` | single-window-no-border + bar-aware gaps | `~/.config/hypr/` |
+| `hypr-chrome` | single-window-no-border + bar-aware gaps lua | `~/.config/hypr/` |
+| `bar-gap` | live gap sync when bar transparency changes (watcher service + boot/theme hooks) | `~/.local/bin`, user systemd, hooks |
 
 Without setup the theme still works — flat cards, stock borders. Shadows and
 window chrome are the soft part.

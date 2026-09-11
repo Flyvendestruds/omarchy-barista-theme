@@ -1,0 +1,12 @@
+[Unit]
+Description=Barista: watch shell.json transparency state (debounced gap sync)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/barista-bar-gap-watch
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

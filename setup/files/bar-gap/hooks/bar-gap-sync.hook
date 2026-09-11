@@ -1,0 +1,4 @@
+#!/bin/bash
+# Apply the bar-aware gap once the desktop is up (belt and suspenders:
+# bar_gap.lua in hyprland.lua already sets this on every Hyprland load).
+~/.local/bin/barista-bar-gap-sync >/dev/null 2>&1 &

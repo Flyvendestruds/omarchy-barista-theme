@@ -1,0 +1,38 @@
+#!/bin/bash
+# Watch shell.json for bar transparency/position changes and sync the
+# Hyprland bar-side gap. Watches the DIRECTORY (not the file) because
+# omarchy-bar rewrites shell.json atomically (tmp + mv), which swaps the
+# inode and silently detaches a file-level inotify watch.
+# Debounced + state-hashed: rapid churn (reminders snapshot, widget state,
+# multi-write toggles) only triggers hyprctl when transparent/position
+# actually changed.
+
+set -u
+
+CONFIG="$HOME/.config/omarchy/shell.json"
+DIR="$(dirname "$CONFIG")"
+BASE="$(basename "$CONFIG")"
+SYNC="$HOME/.local/bin/barista-bar-gap-sync"
+
+bar_state() {
+  python3 -c "
+import json
+try:
+    b = json.load(open('$HOME/.config/omarchy/shell.json')).get('bar', {})
+    print(b.get('transparent', True), b.get('position', 'top'))
+except Exception:
+    print('UNKNOWN')
+" 2>/dev/null
+}
+
+LAST="$(bar_state)"
+
+inotifywait -m -e close_write,moved_to,create --format "%e %f" "$DIR" 2>/dev/null | while read -r events file; do
+  [[ "$file" == "$BASE" ]] || continue
+  sleep 0.2
+  STATE="$(bar_state)"
+  if [[ -n "$STATE" && "$STATE" != "UNKNOWN" && "$STATE" != "$LAST" ]]; then
+    LAST="$STATE"
+    "$SYNC" >/dev/null 2>&1
+  fi
+done

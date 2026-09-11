@@ -1,0 +1,59 @@
+#!/bin/bash
+# Sync the bar-side Hyprland gap with the bar transparency state.
+# transparent bar -> gaps_out on the bar side = 0
+# solid bar      -> gaps_out on the bar side = 6
+# Other sides stay on BASE (6 = current barista/my-theme default).
+# Triggered by: systemd path unit (shell.json writes), theme-set and
+# post-boot hooks. Idempotent and safe to run any time Hyprland is up.
+
+set -u
+
+CONFIG="$HOME/.config/omarchy/shell.json"
+BASE=6
+GAP_TRANSPARENT=0
+GAP_SOLID=6
+
+command -v hyprctl >/dev/null 2>&1 || exit 0
+[[ "${XDG_RUNTIME_DIR:-}" != "" ]] || export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+# hyprctl eval needs HYPRLAND_INSTANCE_SIGNATURE, which systemd user units
+# (watcher, hooks) don't have. Fall back to instance index 0 in that case.
+hyprctl_cmd() {
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    hyprctl "$@"
+  else
+    hyprctl -i 0 "$@"
+  fi
+}
+hyprctl_cmd instances >/dev/null 2>&1 || exit 0
+
+TRANSPARENT="true"
+POSITION="top"
+if [[ -f $CONFIG ]]; then
+  read -r TRANSPARENT POSITION < <(python3 -c "
+import json
+try:
+    cfg = json.load(open('$CONFIG'.replace(chr(39), chr(39))))
+    bar = cfg.get('bar', {}) if isinstance(cfg, dict) else {}
+    t = bar.get('transparent', True)
+    p = bar.get('position', 'top')
+    print(('true' if t is True else 'false'), p if p in ('top','bottom','left','right') else 'top')
+except Exception:
+    print('true top')
+" 2>/dev/null) || { TRANSPARENT="true"; POSITION="top"; }
+fi
+
+if [[ $TRANSPARENT == "true" ]]; then
+  EDGE=$GAP_TRANSPARENT
+else
+  EDGE=$GAP_SOLID
+fi
+
+TOP=$BASE; RIGHT=$BASE; BOTTOM=$BASE; LEFT=$BASE
+case "$POSITION" in
+  top) TOP=$EDGE ;;
+  bottom) BOTTOM=$EDGE ;;
+  left) LEFT=$EDGE ;;
+  right) RIGHT=$EDGE ;;
+esac
+
+hyprctl_cmd eval "hl.config({general={gaps_out={top=$TOP,right=$RIGHT,bottom=$BOTTOM,left=$LEFT}}})" >/dev/null 2>&1
