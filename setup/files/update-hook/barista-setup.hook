@@ -1,24 +1,25 @@
 #!/bin/bash
 # Barista post-update repair: `omarchy update` rewrites /usr/share/omarchy,
-# wiping the QML shadow patch + template default (step 10, root-owned).
+# wiping the QML patches (step 10 shadows + step 60 panel-switch, root-owned).
 # User-owned steps (hypr lua, bar-gap, theme-dev) survive updates untouched.
-# Runs ./setup.sh --step shell-shadows against the LOCAL CLONE, then tells
+# Re-runs the root-owned steps against the LOCAL CLONE, then tells
 # the user to restart the shell. Skipped when the clone is absent (e.g.
 # theme installed on a machine without the dev checkout).
 set -euo pipefail
 
 CLONE="$HOME/Work/omarchy-barista-theme"
-STEP="$CLONE/setup/steps/10-shell-shadows.sh"
+SHADOWS_STEP="$CLONE/setup/steps/10-shell-shadows.sh"
+SWITCH_STEP="$CLONE/setup/steps/60-panel-switch.sh"
 
-if [[ ! -x "$STEP" ]]; then
+if [[ ! -x "$SHADOWS_STEP" ]]; then
   omarchy-notification-send -u normal "Barista: re-apply setup after update" \
     "System files were refreshed — run ./setup.sh in omarchy-barista-theme, then: omarchy restart shell && hyprctl reload" \
     >/dev/null 2>&1 || true
   exit 0
 fi
 
-if sudo "$STEP" >/tmp/barista-post-update-setup.log 2>&1; then
-  omarchy-notification-send -u normal "Barista: shadows re-applied after update" \
+if { sudo "$SHADOWS_STEP" && sudo "$SWITCH_STEP"; } >/tmp/barista-post-update-setup.log 2>&1; then
+  omarchy-notification-send -u normal "Barista: patches re-applied after update" \
     "Run: omarchy restart shell && hyprctl reload. Log: /tmp/barista-post-update-setup.log" \
     >/dev/null 2>&1 || true
 else

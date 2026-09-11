@@ -9,16 +9,17 @@
 set -euo pipefail
 SETUP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-STEPS_ORDER=(shell-shadows hypr-chrome bar-gap theme-dev update-hook)
+STEPS_ORDER=(shell-shadows hypr-chrome bar-gap theme-dev update-hook panel-switch)
 step_file() { case "$1" in
   shell-shadows) echo "$SETUP_ROOT/setup/steps/10-shell-shadows.sh";;
   hypr-chrome)   echo "$SETUP_ROOT/setup/steps/20-hypr-chrome.sh";;
   bar-gap)       echo "$SETUP_ROOT/setup/steps/30-bar-gap.sh";;
   theme-dev)     echo "$SETUP_ROOT/setup/steps/40-theme-dev.sh";;
   update-hook)   echo "$SETUP_ROOT/setup/steps/50-update-hook.sh";;
+  panel-switch)  echo "$SETUP_ROOT/setup/steps/60-panel-switch.sh";;
   *) echo "unknown step: $1" >&2; exit 1;;
 esac; }
-step_needs_root() { [[ "$1" == "shell-shadows" ]]; }
+step_needs_root() { [[ "$1" == "shell-shadows" || "$1" == "panel-switch" ]]; }
 
 MODE=apply
 ONLY=""
@@ -33,7 +34,7 @@ done
 
 STEPS=()
 if [[ -n "$ONLY" ]]; then STEPS=("$ONLY")
-elif [[ "$MODE" == "revert" ]]; then STEPS=(update-hook theme-dev bar-gap hypr-chrome shell-shadows)
+elif [[ "$MODE" == "revert" ]]; then STEPS=(panel-switch update-hook theme-dev bar-gap hypr-chrome shell-shadows)
 else STEPS=("${STEPS_ORDER[@]}"); fi
 
 for step in "${STEPS[@]}"; do

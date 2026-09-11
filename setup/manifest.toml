@@ -22,3 +22,7 @@ steps:
     file: steps/50-update-hook.sh
     needs_root: false
     description: post-update repair (re-run shell-shadows + notify)
+  - id: panel-switch
+    file: steps/60-panel-switch.sh
+    needs_root: true
+    description: one-click panel switch (forward bar clicks across widgets while a panel is open)

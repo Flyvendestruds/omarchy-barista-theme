@@ -33,6 +33,7 @@ omarchy restart shell && hyprctl reload
 | `bar-gap` | live gap sync when bar transparency changes; runs only while barista is active (theme-set/post-boot gates) | `~/.local/bin`, user systemd, hooks |
 | `theme-dev` | live-edit loop (`barista-tokens-apply` + watcher units). Dev-only, skip on fresh machines | `~/.local/bin`, user systemd |
 | `update-hook` | post-update repair (re-runs `shell-shadows` after `omarchy update`, notifies) | `~/.config/omarchy/hooks/post-update.d` |
+| `panel-switch` | one-click switching between bar popouts (clicking another widget opens it instead of just closing the current one) | `/usr/share/omarchy` (sudo) |
 
 Without setup the theme still works — flat cards, stock borders. Shadows and
 window chrome are the soft part.
