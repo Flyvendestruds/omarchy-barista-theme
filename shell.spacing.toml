@@ -1,0 +1,33 @@
+[spacing]
+# Density of the whole shell. scale (1.0) multiplies every margin, gap,
+# padding, control and panel dimension at once; components keep proportions.
+# scale-with-font also tracks [font] base-size. Uncomment ONE token to pin
+# just that surface — e.g. panel-padding for roomier cards, control-height
+# for taller rows — without touching the rest.
+scale = 1.0
+scale-with-font = true
+# xxs                       = 2
+# xs                        = 3
+# sm                        = 4
+# md                        = 6
+# lg                        = 8
+# xl                        = 10
+# xxl                       = 12
+# xxxl                      = 14
+# huge                      = 18
+# control-gap               = 8
+# control-padding-x         = 10
+# control-padding-y         = 6
+# input-padding-y           = 7
+# control-height            = 28
+# popup-row-height          = 28
+# row-gap                   = 8
+# row-padding-x             = 12
+# label-gap                 = 4
+# panel-gap                 = 14
+# panel-padding             = 18
+# popup-padding             = 14
+# dropdown-width            = 240
+# searchable-dropdown-width = 260
+# number-field-width        = 120
+# searchable-popup-min-height = 220

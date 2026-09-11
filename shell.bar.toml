@@ -1,0 +1,17 @@
+[bar]
+# The bar itself. background/text paint the strip; active is the
+# attention color for recording/voxtype/update indicators.
+# size-horizontal = top/bottom bar HEIGHT in px (at base-size 12).
+# size-vertical = left/right bar WIDTH. scale-with-font grows these with
+#   [font] base-size so bigger text doesn't clip.
+background       = "#ffffff"
+background-alpha = 1
+text             = "#333"
+# Modules calling attention to themselves (recording, voxtype, alerts, updates)
+active           = "#d20f39"
+# Cross-axis size at font base-size 12. size-horizontal is the height of
+# top/bottom bars; size-vertical is the width of left/right bars. With
+# scale-with-font enabled, these grow/shrink with [font] base-size.
+scale-with-font  = true
+size-horizontal  = 26
+size-vertical    = 28

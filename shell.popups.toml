@@ -1,0 +1,10 @@
+[popups]
+# Every bar flyout: widget panels (clock calendar, audio, network, ...),
+# OSD, dropdown lists, popup cards, keyboard panel.
+# border-width: 0 = borderless (soft look); 1-2 = outlined.
+background       = "#ffffff"
+background-alpha = 1
+border           = "hyprland.active-border"
+text             = "#333333"
+border-alpha     = 1.0
+border-width     = 0

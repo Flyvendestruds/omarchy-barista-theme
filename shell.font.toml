@@ -1,0 +1,27 @@
+[font]
+# Type scale. base-size is the rem root (px): every token below derives
+# from it via a fixed multiplier, so raising base-size rescales the whole
+# shell proportionally. Uncomment a token to pin just that step.
+#
+# Live preview: run `omarchy dev ui-preview`, scroll to Typography — every
+# token renders at its live size with a sample. Save here, re-summon the
+# preview to see the new sizes.
+base-size = 12
+# caption       = 10   # Style.font.caption — section headers, bar indicators
+# body-small    = 11   # Style.font.bodySmall — secondary + tooltip text,
+#                      #   small button text, number fields
+# body          = 12   # Style.font.body — THE main knob: bar labels,
+#                      #   buttons, dropdown rows, most panel text.
+#                      #   If the bar didn't change, this is why.
+# subtitle      = 13   # Style.font.subtitle — row titles, toggle titles
+# title         = 14   # Style.font.title — card titles, dialogs, panel heroes,
+#                      #   clipboard/menu/OSD/notification titles
+# heading       = 16   # Style.font.heading — panel headings (clipboard, emojis,
+#                      #   menu, lock, bluetooth/dropbox/tailscale, reminders)
+# display       = 24   # Style.font.display — large display text + hero icon size
+# display-large = 28   # Style.font.displayLarge — biggest: clipboard, emojis,
+#                      #   menu, OSD, notification cards, power panel
+# icon-small    = 11   # Style.font.iconSmall — ~unused (gallery only), ignore
+# icon          = 14   # Style.font.icon — button + panel icon glyphs
+# icon-large    = 18   # Style.font.iconLarge — large icons: menu, polkit auth,
+#                      #   media widget

@@ -1,0 +1,7 @@
+[tooltip]
+# Bar/panel hover tooltips only. Same paint as popups, separate tokens.
+background       = "#ffffff"
+background-alpha = 0.97
+text             = "#4c4f69"
+border           = "hyprland.active-border-foreground"
+border-alpha     = 1.0

@@ -1,0 +1,11 @@
+[notifications]
+# Notification cards. countdown = progress-bar color on timed notifications.
+background       = "#ffffff"
+background-alpha = 1
+text             = "#333333"
+# Conventionally matches the Hyprland active-window border. Border accepts
+# either a solid color or the full active-border gradient.
+border           = "hyprland.active-border"
+border-alpha     = 1.0
+border-width     = 0
+countdown        = "#0066cc"
