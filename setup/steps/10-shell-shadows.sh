@@ -705,4 +705,71 @@ patch(SHELL/'plugins/osd/Osd.qml', osd_old, osd_new)
 patch(OV/'barista.osd/Osd.qml', osd_old, osd_new)
 print("hunk 10 done")
 EOF
+
+echo "== 11. Panel/popout bar standoff follows per-side gaps =="
+# Weather/clock/audio/... panels (KeyboardPanel, centerOnBar) and bar
+# popouts (PopupCard) clear the bar strip with the max-side scalar, so the
+# bar-side standoff never moved on transparency toggle — same bug hunk 10
+# fixed for toasts/OSD. Point the bar-edge standoff at the per-side halves
+# (hunk 9). Parallel clamps and size caps keep the scalar (never bar-touching).
+# Stock only: no barista.* overrides exist for these Ui components.
+bak "$SHELL_DIR/Ui/KeyboardPanel.qml"
+bak "$SHELL_DIR/Ui/PopupCard.qml"
+python3 - <<'EOF'
+import pathlib
+SHELL = pathlib.Path('/usr/share/omarchy/shell')
+MARK = 'barista: per-side edge margins'
+
+def patch(path, old, new, sentinel=None):
+    try:
+        src = path.read_text()
+    except FileNotFoundError:
+        print(f"skip (missing): {path}")
+        return
+    if (sentinel or new) in src:
+        print(f"already patched {path}")
+        return
+    if old not in src:
+        print(f"SKIP {path.name}: anchor not found")
+        return
+    path.write_text(src.replace(old, new, 1))
+    print(f"patched {path}")
+
+# -- KeyboardPanel: gap is the bar-edge standoff (cardOrigin y = barH + gap,
+# _barStripSize, available-size bar subtraction). barPos already exists.
+kb_old = "  property int gap: Style.gapsOut  // distance between bar edge and panel"
+kb_new = """  // %s: bar-edge standoff follows the bar-side half (0 under a
+  // transparent bar), so centered panels hug the bar exactly like windows.
+  property int gap: barPos === "top" ? Style.gapTop : barPos === "bottom" ? Style.gapBottom : barPos === "left" ? Style.gapLeft : barPos === "right" ? Style.gapRight : Style.gapsOut  // distance between bar edge and panel""" % MARK
+patch(SHELL/'Ui/KeyboardPanel.qml', kb_old, kb_new)
+
+# -- PopupCard: add barGap for the perpendicular (away-from-bar) offsets;
+# margin keeps serving parallel clamps and size caps.
+pc_old_margin = "  property int margin: Style.gapsOut\n"
+pc_new_margin = """  property int margin: Style.gapsOut
+  // %s: standoff from the bar edge follows the bar-side half (0 under a
+  // transparent bar). margin keeps serving parallel clamps and size caps.
+  readonly property string barPos: bar ? bar.position : "top"
+  property int barGap: barPos === "top" ? Style.gapTop : barPos === "bottom" ? Style.gapBottom : barPos === "left" ? Style.gapLeft : barPos === "right" ? Style.gapRight : Style.gapsOut
+""" % MARK
+patch(SHELL/'Ui/PopupCard.qml', pc_old_margin, pc_new_margin)
+
+pc_pairs = [
+  ("      var localY = target.height + root.margin",
+   "      var localY = target.height + root.barGap"),
+  ("        localY = -popupHeight - root.margin",
+   "        localY = -popupHeight - root.barGap"),
+  ("        localX = target.width + root.margin",
+   "        localX = target.width + root.barGap"),
+  ("        localX = -popupWidth - root.margin",
+   "        localX = -popupWidth - root.barGap"),
+  ('          cy = root.bar.position === "bottom" ? -popupHeight - root.margin : window.height + root.margin',
+   '          cy = root.bar.position === "bottom" ? -popupHeight - root.barGap : window.height + root.barGap'),
+  ('          cx = root.bar.position === "left" ? window.width + root.margin : -popupWidth - root.margin',
+   '          cx = root.bar.position === "left" ? window.width + root.barGap : -popupWidth - root.barGap'),
+]
+for old, new in pc_pairs:
+    patch(SHELL/'Ui/PopupCard.qml', old, new)
+print("hunk 11 done")
+EOF
 echo "shell-shadows: done."
