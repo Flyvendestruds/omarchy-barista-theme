@@ -423,6 +423,12 @@ echo "== 9. Style.qml (barista gap-following margins) =="
 # Half of the effective Hyprland gaps_out, refreshed live — notifications,
 # menus, popups and OSD all anchor off Style.gapsOut, so one value moves
 # every shell surface at once. Stock gap math (half) is kept.
+# Per-side halves (gapTop/gapRight/gapBottom/gapLeft): the bar-gap sync
+# zeroes the bar edge (e.g. "0 6 6 6" with a transparent top bar), so the
+# bar-side shell margin must be 0 too — windows sit at 0 there, and shell
+# surfaces should sit at the same line. The other three sides keep their
+# own halves. gapsOut (max of sides) stays as the legacy scalar for menus,
+# popups and inner clamps that never touch the bar edge.
 # Barista tie-in: body gated by `baristaGapLive`. The stock shell knows
 # nothing about themes, so step 30's bar-gap-sync publishes BOTH the
 # effective gaps_out (css "T R B L") AND the active theme name (barista?)
@@ -431,8 +437,8 @@ echo "== 9. Style.qml (barista gap-following margins) =="
 # (configreloaded fires only on full reload, not on `hyprctl keyword` /
 # `hl.config()` live eval), so the shell polls the file every 2s AND
 # re-polls right after theme switches land (see shell applyTheme hunk).
-# Non-barista themes reset gapsOut to the stock default, so foreign themes
-# never inherit barista spacing from a stale state file.
+# Non-barista themes reset all five values to the stock default, so foreign
+# themes never inherit barista spacing from a stale state file.
 # shell.qml is touched too — back it up like every other system file.
 bak "$SHELL_DIR/shell.qml"
 python3 - <<'EOF'
@@ -456,10 +462,12 @@ else:
   }'''
     assert old in src, "applyGapsOutJson not found"
     new = '''  // barista: gap-following margins.
-  // The bar-gap sync zeroes the bar edge of gaps_out (e.g. "0 6 6 6"
-  // with a transparent top bar); the first side would then collapse every
-  // shell margin to 0. Take the max of the four effective sides instead —
-  // shell surfaces want the roomy window-gap feel, not the bar-side 0.
+  // Per-side halves of the effective gaps_out (css "T R B L"): the bar-gap
+  // sync zeroes the bar edge, and shell surfaces on that edge must sit at
+  // the same line as windows (0), not at the roomy max-side value. The
+  // other sides keep their own halves. gapsOut (max of sides, halved) stays
+  // as the legacy scalar for menus/popups/inner clamps that never touch
+  // the bar edge.
   function applyGapsOutJson(raw) {
     try {
       var json = JSON.parse(raw || "{}")
@@ -484,9 +492,20 @@ else:
   // leak barista spacing onto a foreign theme.
   function applyGapValue(n, stockDefault) {
     var dflt = (isFinite(stockDefault) && stockDefault >= 0) ? stockDefault : 5
-    if (!baristaGapLive) { gapsOut = dflt; return }
+    if (!baristaGapLive) { gapsOut = dflt; gapTop = dflt; gapRight = dflt; gapBottom = dflt; gapLeft = dflt; return }
     if (isFinite(n) && n >= 0) gapsOut = Math.max(0, Math.round(n / 2))
   }
+
+  // Per-side halves of the effective gaps_out. Set by parseGapState (which
+  // sees all four sides); the hyprctl path above only knows the max, so it
+  // leaves the sides alone. Consumers on a screen edge (notification top
+  // margin, OSD bottom margin, popupCard/popout clearance) bind here so the
+  // bar-side margin is 0 exactly when windows sit at 0 there. Legacy
+  // gapsOut keeps serving inner clamps that never touch an edge.
+  property int gapTop: 5
+  property int gapRight: 5
+  property int gapBottom: 5
+  property int gapLeft: 5
 
   property bool baristaGapLive: baristaThemeActive
 
@@ -513,6 +532,7 @@ else:
   }
 
   // Single-flight parse: the watcher FileView re-reads before parsing.
+  // css order is "top right bottom left" (hyprctl getoption css format).
   function parseGapState() {
     var lines = String(gapStateFile.text() || "").split("\\n")
     var css = lines.length > 0 ? lines[0] : ""
@@ -524,9 +544,16 @@ else:
       var v = Number(parts[i])
       if (isFinite(v) && v >= 0) vals.push(v)
     }
-    var peak = vals.length > 0 ? vals[0] : NaN
-    for (var j = 1; j < vals.length; j++) if (vals[j] > peak) peak = vals[j]
-    root.applyGapValue(peak, 5)
+    while (vals.length < 4) vals.push(vals.length > 0 ? vals[0] : NaN)
+    function half(v) { return (isFinite(v) && v >= 0) ? Math.max(0, Math.round(v / 2)) : 5 }
+    if (root.baristaGapLive) {
+      gapTop = half(vals[0]); gapRight = half(vals[1]); gapBottom = half(vals[2]); gapLeft = half(vals[3])
+      var peak = vals[0]
+      for (var j = 1; j < 4; j++) if (vals[j] > peak) peak = vals[j]
+      root.applyGapValue(peak, 5)
+    } else {
+      root.applyGapValue(NaN, 5)
+    }
   }
 
   // Poll the state file: covers live gap edits between FileView events.
@@ -563,10 +590,116 @@ else:
       return "ok"
     }'''
     assert old_ipc in ssrc, "shell applyTheme IPC not found"
-    new_ipc = old_ipc.replace("      Style.scheduleRefresh()\n",
-                              "      Style.scheduleRefresh()\n      Style.gapStateFile.reload()\n")
+    new_ipc = old_ipc.replace("      Style.scheduleRefresh()\\n",
+                              "      Style.scheduleRefresh()\\n      Style.gapStateFile.reload()\\n")
     ssrc = ssrc.replace(old_ipc, new_ipc, 1)
     sp.write_text(ssrc)
     print("shell.qml: applyTheme re-polls gap state")
+EOF
+
+echo "== 10. Edge-anchored margins follow per-side gaps =="
+# Notification toasts sit top-right; OSD sits bottom-center; popups clear
+# the bar strip. All three derived their edge standoff from the single
+# max-side scalar (or barSize+scalar), so toggling bar transparency — which
+# only zeroes the bar-edge side — never moved the edge-anchored margin.
+# Fix: pass the per-side halves (hunk 9) into the margin math.
+# Stock files AND barista.* user overrides (which shadow them) both get the
+# same edit — the override is what the shell actually loads. Non-barista
+# themes are unaffected: hunk 9 resets all five values to stock default.
+python3 - <<'EOF'
+import pathlib, os
+SHELL = pathlib.Path('/usr/share/omarchy/shell')
+HOME = pathlib.Path(os.path.expanduser("~"))
+OV = HOME/'.config/omarchy/plugins'
+MARK = 'barista: per-side edge margins'
+
+def patch(path, old, new, sentinel=None):
+    try:
+        src = path.read_text()
+    except FileNotFoundError:
+        print(f"skip (missing): {path}")
+        return
+    if (sentinel or new) in src:
+        print(f"already patched {path}")
+        return
+    if old not in src:
+        print(f"SKIP {path.name}: anchor not found")
+        return
+    path.write_text(src.replace(old, new, 1))
+    print(f"patched {path}")
+
+# -- notifications Service.qml: thread gapTop through to the placement call.
+notif_old = """      readonly property var popupPlacement: NotificationLogic.popupPlacement(
+        service.barPosition, service.barClearance, Style.gapsOut)"""
+notif_old = """  readonly property int barClearance: liveBarSize + Style.gapsOut"""
+notif_new = """  // %s: clearance uses the per-side gap of the touched
+  // corner (gapTop for a top bar), so the toast top margin is 26
+  // under a transparent bar and 29 under a solid one — matching
+  // windows at 0 vs 6. Falls back to the scalar off-barista (all 5).
+  readonly property int barClearance: liveBarSize + (barPosition === "top" ? Style.gapTop : barPosition === "right" ? Style.gapRight : Style.gapsOut)""" % MARK
+patch(SHELL/'plugins/notifications/Service.qml', notif_old, notif_new)
+patch(OV/'barista.notifications/Service.qml', notif_old, notif_new)
+
+place_old = """      readonly property var popupPlacement: NotificationLogic.popupPlacement(
+        service.barPosition, service.barClearance, Style.gapsOut)"""
+place_new = """      // %s: gapTop/gapRight carry the bar-edge halves so the toast
+      // corner margins move with the touched screen edges.
+      readonly property var popupPlacement: NotificationLogic.popupPlacement(
+        service.barPosition, service.barClearance, Style.gapsOut, Style.gapTop, Style.gapRight)""" % MARK
+patch(SHELL/'plugins/notifications/Service.qml', place_old, place_new)
+patch(OV/'barista.notifications/Service.qml', place_old, place_new)
+
+# -- NotificationLogic.js: 4th/5th args (top/right per-side halves);
+# defaults preserve stock behavior when called with 3 args.
+js_old = """function popupPlacement(barPosition, barClearance, gapsOut) {
+  var position = String(barPosition || "top")
+  var clearance = Number(barClearance)
+  var gap = Number(gapsOut)
+  if (!isFinite(clearance)) clearance = 0
+  if (!isFinite(gap)) gap = 0
+
+  return {
+    anchors: { top: true, bottom: false, left: false, right: true },
+    margins: {
+      top: position === "top" ? clearance : gap,
+      bottom: gap,
+      left: gap,
+      right: position === "right" ? clearance : gap
+    }
+  }
+}"""
+js_new = """// %s: gapTop/gapRight are the per-side halves (hunk 9). The toast
+// touches the top-right corner, so those two margins follow the touched
+// edges; bottom/left keep the scalar (inner clamps, never edge-touched).
+// NOTE: clearance already includes the per-side gap (Service.qml adds
+// gapTop/gapRight, not the scalar), so use it directly — no re-adding.
+function popupPlacement(barPosition, barClearance, gapsOut, gapTop, gapRight) {
+  var position = String(barPosition || "top")
+  var clearance = Number(barClearance)
+  var gap = Number(gapsOut)
+  var topGap = isFinite(Number(gapTop)) ? Number(gapTop) : gap
+  var rightGap = isFinite(Number(gapRight)) ? Number(gapRight) : gap
+  if (!isFinite(clearance)) clearance = 0
+  if (!isFinite(gap)) gap = 0
+
+  return {
+    anchors: { top: true, bottom: false, left: false, right: true },
+    margins: {
+      top: position === "top" ? clearance : topGap,
+      bottom: gap,
+      left: gap,
+      right: position === "right" ? clearance : rightGap
+    }
+  }
+}""" % MARK
+patch(SHELL/'plugins/notifications/NotificationLogic.js', js_old, js_new)
+patch(OV/'barista.notifications/NotificationLogic.js', js_old, js_new)
+
+# -- OSD: bottom-anchored card; follow the bottom per-side half.
+osd_old = "      anchors.bottomMargin: Style.space(67) + Style.shadowMargin"
+osd_new = "      // %s\n      anchors.bottomMargin: Style.space(67) + Style.shadowMargin + Style.gapBottom - Style.gapsOut" % MARK
+patch(SHELL/'plugins/osd/Osd.qml', osd_old, osd_new)
+patch(OV/'barista.osd/Osd.qml', osd_old, osd_new)
+print("hunk 10 done")
 EOF
 echo "shell-shadows: done."
