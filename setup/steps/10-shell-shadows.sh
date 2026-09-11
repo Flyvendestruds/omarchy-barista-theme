@@ -340,4 +340,154 @@ if old in src:
 else:
     print("Menu clamp already patched")
 EOF
+echo "== 8. Style.qml (barista gap-following margins) =="
+# Half of the effective Hyprland gaps_out, refreshed live — notifications,
+# menus, popups and OSD all anchor off Style.gapsOut, so one value moves
+# every shell surface at once. Stock gap math (half) is kept.
+# Barista tie-in: body gated by `baristaGapLive`. The stock shell knows
+# nothing about themes, so step 30's bar-gap-sync publishes BOTH the
+# effective gaps_out (css "T R B L") AND the active theme name (barista?)
+# to ~/.local/state/omarchy/barista/gaps_out. That single state file is the
+# shell's clock for the bar-gap: no Hyprland event stream exists in QML
+# (configreloaded fires only on full reload, not on `hyprctl keyword` /
+# `hl.config()` live eval), so the shell polls the file every 2s AND
+# re-polls right after theme switches land (see shell applyTheme hunk).
+# Non-barista themes reset gapsOut to the stock default, so foreign themes
+# never inherit barista spacing from a stale state file.
+# shell.qml is touched too — back it up like every other system file.
+bak "$SHELL_DIR/shell.qml"
+python3 - <<'EOF'
+import pathlib
+p = pathlib.Path('/usr/share/omarchy/shell/Commons/Style.qml')
+src = p.read_text()
+MARK = 'barista: gap-following margins'
+if MARK in src:
+    print("Style: gap-following margins already patched")
+else:
+    old = '''  function applyGapsOutJson(raw) {
+    try {
+      var json = JSON.parse(raw || "{}")
+      var css = String(json.css || "")
+      var parts = css.match(/-?\\d+(?:\\.\\d+)?/g) || []
+      var n = parts.length > 0 ? Number(parts[0]) : Number(json.int)
+      if (isFinite(n) && n >= 0) gapsOut = Math.max(0, Math.round(n / 2))
+    } catch (e) {
+      // hyprctl missing / Hyprland not running — leave the previous value.
+    }
+  }'''
+    assert old in src, "applyGapsOutJson not found"
+    new = '''  // barista: gap-following margins.
+  // The bar-gap sync zeroes the bar edge of gaps_out (e.g. "0 6 6 6"
+  // with a transparent top bar); the first side would then collapse every
+  // shell margin to 0. Take the max of the four effective sides instead —
+  // shell surfaces want the roomy window-gap feel, not the bar-side 0.
+  function applyGapsOutJson(raw) {
+    try {
+      var json = JSON.parse(raw || "{}")
+      var css = String(json.css || "")
+      var parts = css.match(/-?\\d+(?:\\.\\d+)?/g) || []
+      var vals = []
+      for (var i = 0; i < parts.length; i++) {
+        var v = Number(parts[i])
+        if (isFinite(v) && v >= 0) vals.push(v)
+      }
+      if (vals.length === 0) vals.push(Number(json.int))
+      var peak = vals.length > 0 ? vals[0] : NaN
+      for (var j = 1; j < vals.length; j++) if (vals[j] > peak) peak = vals[j]
+      if (isFinite(peak) && peak >= 0) applyGapValue(peak, 5)
+    } catch (e) {
+      // hyprctl missing / Hyprland not running — leave the previous value.
+    }
+  }
+
+  // barista: gap-following margins: single choke point for the margin value. Non-barista themes
+  // always reset to the stock default so a stale state file can never
+  // leak barista spacing onto a foreign theme.
+  function applyGapValue(n, stockDefault) {
+    var dflt = (isFinite(stockDefault) && stockDefault >= 0) ? stockDefault : 5
+    if (!baristaGapLive) { gapsOut = dflt; return }
+    if (isFinite(n) && n >= 0) gapsOut = Math.max(0, Math.round(n / 2))
+  }
+
+  property bool baristaGapLive: baristaThemeActive
+
+  // The shell has no theme concept; step 30 publishes the live theme name
+  // next to the gaps state (see gapStateFile below). Default false so a
+  // missing/unreadable file can never enable barista behavior.
+  property bool baristaThemeActive: false
+
+  // Effective gaps_out published by step 30's bar-gap-sync
+  // (~/.local/state/omarchy/barista/gaps_out, css "T R B L" + theme line).
+  // Polled: no Hyprland event stream reaches QML for live `hyprctl keyword`
+  // / hl.config() changes — configreloaded only fires on full reloads.
+  property FileView gapStateFile: FileView {
+    id: gapStateFile
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/barista/gaps_out"
+    watchChanges: true
+    printErrors: false
+    // text() is stale inside onFileChanged itself — reload() re-reads, and
+    // the fresh content arrives via onLoaded -> parseGapState (same pattern
+    // as Color.userShellFile above).
+    onFileChanged: gapStateFile.reload()
+    onLoaded: root.parseGapState()
+    onLoadFailed: root.applyGapValue(NaN, 5)
+  }
+
+  // Single-flight parse: the watcher FileView re-reads before parsing.
+  function parseGapState() {
+    var lines = String(gapStateFile.text() || "").split("\\n")
+    var css = lines.length > 0 ? lines[0] : ""
+    var theme = lines.length > 1 ? String(lines[1] || "").replace(/^\\s+|\\s+$/g, "").toLowerCase() : ""
+    root.baristaThemeActive = (theme === "barista")
+    var parts = String(css).match(/-?\\d+(?:\\.\\d+)?/g) || []
+    var vals = []
+    for (var i = 0; i < parts.length; i++) {
+      var v = Number(parts[i])
+      if (isFinite(v) && v >= 0) vals.push(v)
+    }
+    var peak = vals.length > 0 ? vals[0] : NaN
+    for (var j = 1; j < vals.length; j++) if (vals[j] > peak) peak = vals[j]
+    root.applyGapValue(peak, 5)
+  }
+
+  // Poll the state file: covers live gap edits between FileView events.
+  // No Hyprland event stream reaches QML for `hyprctl keyword` /
+  // hl.config() edits — configreloaded only fires on full reloads.
+  property Timer gapPollTimer: Timer {
+    interval: 2000
+    repeat: true
+    running: true
+    onTriggered: gapStateFile.reload()
+  }
+
+'''
+    src = src.replace(old, new, 1)
+    print("Style: gap-following parser + state poll installed")
+    p.write_text(src)
+    print("Style patched (gap-following margins)")
+
+# Independent IPC hunk with its own marker: a package update can
+# revert shell.qml without reverting Style.qml.
+sp = pathlib.Path('/usr/share/omarchy/shell/shell.qml')
+ssrc = sp.read_text()
+if 'Style.gapStateFile.reload()' in ssrc:
+    print("shell.qml: gap re-poll already present")
+else:
+    old_ipc = '''    function applyTheme(colorsB64: string, shellB64: string): string {
+      var colorsRaw = ""
+      var shellRaw = ""
+      try { colorsRaw = Qt.atob(String(colorsB64 || "")) } catch (e) { colorsRaw = "" }
+      try { shellRaw = Qt.atob(String(shellB64 || "")) } catch (e2) { shellRaw = "" }
+      Color.loadColors(colorsRaw)
+      Color.loadShell(shellRaw)
+      Style.scheduleRefresh()
+      return "ok"
+    }'''
+    assert old_ipc in ssrc, "shell applyTheme IPC not found"
+    new_ipc = old_ipc.replace("      Style.scheduleRefresh()\n",
+                              "      Style.scheduleRefresh()\n      Style.gapStateFile.reload()\n")
+    ssrc = ssrc.replace(old_ipc, new_ipc, 1)
+    sp.write_text(ssrc)
+    print("shell.qml: applyTheme re-polls gap state")
+EOF
 echo "shell-shadows: done."

@@ -57,3 +57,14 @@ case "$POSITION" in
 esac
 
 hyprctl_cmd eval "hl.config({general={gaps_out={top=$TOP,right=$RIGHT,bottom=$BOTTOM,left=$LEFT}}})" >/dev/null 2>&1
+
+# Publish the effective gaps + active theme for the shell's gap-following
+# margins (step 10, Style.qml section 8). The shell has no theme concept
+# and no Hyprland event stream for live `hyprctl keyword` / hl.config()
+# edits, so this state file is its clock: line 1 = css "T R B L",
+# line 2 = theme name (barista?). Written on every sync even when Hyprland
+# is down, so theme switches without a compositor round-trip still land.
+STATE_DIR="$HOME/.local/state/omarchy/barista"
+mkdir -p "$STATE_DIR" 2>/dev/null || true
+THEME="$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+printf '%s %s %s %s\n%s\n' "$TOP" "$RIGHT" "$BOTTOM" "$LEFT" "${THEME:-unknown}" > "$STATE_DIR/gaps_out" 2>/dev/null || true

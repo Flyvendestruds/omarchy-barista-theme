@@ -1,7 +1,8 @@
 #!/bin/bash
-# Barista-only: start the gap watcher at boot when barista is the active
-# theme, otherwise make sure it's stopped (e.g. user switched away last
-# session). Reads the same theme.name file `omarchy theme set` writes.
+# Theme-aware: start the gap watcher at boot for barista, otherwise make
+# sure it's stopped (e.g. user switched away last session). Either way run
+# the sync once so the shell's gap state carries the current theme name.
+# Reads the same theme.name file `omarchy theme set` writes.
 CURRENT="$HOME/.local/state/omarchy/current/theme.name"
 UNIT="barista-bar-gap-watcher.service"
 BIN="$HOME/.local/bin/barista-bar-gap-sync"
@@ -11,4 +12,5 @@ if [[ -f "$CURRENT" ]] && [[ "$(cat "$CURRENT" 2>/dev/null)" == "barista" ]]; th
   "$BIN" >/dev/null 2>&1 &
 else
   systemctl --user disable --now "$UNIT" >/dev/null 2>&1 || true
+  "$BIN" >/dev/null 2>&1 &
 fi

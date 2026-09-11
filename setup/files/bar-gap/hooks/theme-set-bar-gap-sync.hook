@@ -1,7 +1,8 @@
 #!/bin/bash
-# Barista-only: start the gap watcher when the barista theme is set,
-# stop it for any other theme.
-# omarchy-hook passes the theme name as $1 (omarchy-theme-set line 341).
+# Theme-aware: start the gap watcher for barista, stop it otherwise.
+# Either way run the sync once so the shell's gap state file picks up the
+# new theme name (barista enables gap-following margins; other themes reset
+# to stock). omarchy-hook passes the theme name as $1.
 # The post-boot hook + bar_gap.lua cover hypr loads; this covers live
 # theme switches without reboot.
 THEME="${1:-}"
@@ -13,4 +14,5 @@ if [[ "$THEME" == "barista" ]]; then
   "$BIN" >/dev/null 2>&1 &
 else
   systemctl --user disable --now "$UNIT" >/dev/null 2>&1 || true
+  "$BIN" >/dev/null 2>&1 &
 fi
