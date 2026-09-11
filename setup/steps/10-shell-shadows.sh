@@ -271,7 +271,7 @@ new = '''    BorderSurface {
       id: card
       shadow: true
 '''
-if old in src and 'shadow: true' not in src.split(old)[0][-200:]:
+if old in src and 'shadow: true' not in src:
     # only insert if this specific block lacks it
     src = src.replace(old, new, 1)
     changed = True
@@ -342,23 +342,25 @@ else:
 EOF
 
 echo "== 8. User plugin overrides (~/.config/omarchy/plugins/barista.*) =="
-# User-owned: must run as the REAL user, not root. Under sudo, $HOME is
-# /root and the overrides are invisible (hence the old "no override, skip"
-# wall). Re-exec this hunk via runuser/su when root, else run directly.
-run_as_user() {
-  if (( EUID == 0 )) && [[ -n "${SUDO_USER:-}" ]]; then
-    runuser -u "$SUDO_USER" -- "$@"
-  elif (( EUID == 0 )); then
-    echo "hunk 8: running as root without SUDO_USER — overrides live in a user HOME I cannot see. Skipping." >&2
-    echo "hunk 8: re-run this step WITHOUT sudo (hunks 1-7,9 need it, this one doesn't)."
-    return 0
-  else
-    "$@"
-  fi
-}
-run_as_user python3 - <<'EOF'
+# User-owned, patched WITHOUT root: run as $SUDO_USER when under sudo
+# (under sudo, $HOME is /root and expanduser("~") points at the wrong
+# place), else as the current user. SUDO_USER detection first, because a
+# root-owned shell (pkexec, su) may also have a stale $HOME.
+REAL_HOME="${SUDO_HOME:-}"
+if [[ -z "$REAL_HOME" && -n "${SUDO_USER:-}" ]]; then
+  REAL_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+fi
+if [[ -z "$REAL_HOME" && (( EUID != 0 )) ]]; then
+  REAL_HOME="$HOME"
+fi
+if [[ -z "$REAL_HOME" || ! -d "$REAL_HOME/.config/omarchy/plugins" ]]; then
+  echo "hunk 8: no user plugin dir visible (HOME=$HOME SUDO_USER=${SUDO_USER:-unset}) — skipping." >&2
+  echo "hunk 8: re-run WITHOUT sudo to patch the user overrides."
+fi
+if [[ -n "$REAL_HOME" && -d "$REAL_HOME/.config/omarchy/plugins" ]]; then
+  OV_HOME="$REAL_HOME" python3 - <<'EOF'
 import pathlib, os
-HOME = pathlib.Path(os.path.expanduser("~"))
+HOME = pathlib.Path(os.environ.get("OV_HOME") or os.path.expanduser("~"))
 OV = HOME/'.config/omarchy/plugins'
 # (override file, anchor id line) — same semantics as hunk 6
 targets = {
@@ -419,6 +421,7 @@ if p.exists():
 else:
     print("no override, skip: barista.osd/Osd.qml")
 EOF
+fi
 echo "== 9. Style.qml (barista gap-following margins) =="
 # Half of the effective Hyprland gaps_out, refreshed live — notifications,
 # menus, popups and OSD all anchor off Style.gapsOut, so one value moves
@@ -628,18 +631,18 @@ def patch(path, old, new, sentinel=None):
     path.write_text(src.replace(old, new, 1))
     print(f"patched {path}")
 
-# -- notifications Service.qml: thread gapTop through to the placement call.
-notif_old = """      readonly property var popupPlacement: NotificationLogic.popupPlacement(
-        service.barPosition, service.barClearance, Style.gapsOut)"""
-notif_old = """  readonly property int barClearance: liveBarSize + Style.gapsOut"""
-notif_new = """  // %s: clearance uses the per-side gap of the touched
+# -- notifications Service.qml
+# (1) clearance: use the per-side gap of the touched corner.
+clearance_old = """  readonly property int barClearance: liveBarSize + Style.gapsOut"""
+clearance_new = """  // %s: clearance uses the per-side gap of the touched
   // corner (gapTop for a top bar), so the toast top margin is 26
   // under a transparent bar and 29 under a solid one — matching
   // windows at 0 vs 6. Falls back to the scalar off-barista (all 5).
   readonly property int barClearance: liveBarSize + (barPosition === "top" ? Style.gapTop : barPosition === "right" ? Style.gapRight : Style.gapsOut)""" % MARK
-patch(SHELL/'plugins/notifications/Service.qml', notif_old, notif_new)
-patch(OV/'barista.notifications/Service.qml', notif_old, notif_new)
+patch(SHELL/'plugins/notifications/Service.qml', clearance_old, clearance_new)
+patch(OV/'barista.notifications/Service.qml', clearance_old, clearance_new)
 
+# (2) placement call: thread the per-side halves through.
 place_old = """      readonly property var popupPlacement: NotificationLogic.popupPlacement(
         service.barPosition, service.barClearance, Style.gapsOut)"""
 place_new = """      // %s: gapTop/gapRight carry the bar-edge halves so the toast
