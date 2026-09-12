@@ -4,7 +4,9 @@
 #     omarchy-bar rewrites shell.json atomically via tmp + mv, which swaps
 #     the inode and silently detaches a file-level watch). Debounced +
 #     state-hashed so reminders/widget churn doesn't trigger hyprctl.
-#  2. Hyprland gaps_out edits made outside this script (looknfeel tweaks,
+#  2. bar-off toggle (bar shown/hidden): inotify on the toggles dir.
+#     A hidden bar keeps the solid gap, so hidden counts as solid.
+#  3. Hyprland gaps_out edits made outside this script (looknfeel tweaks,
 #     `hyprctl` experiments): polled every 3s with a full sync. The sync
 #     derives its base from the live non-bar sides, so it adopts the new
 #     size while re-applying the bar-side rule — converging in one extra
@@ -15,7 +17,11 @@ set -u
 CONFIG="$HOME/.config/omarchy/shell.json"
 DIR="$(dirname "$CONFIG")"
 BASE_F="$(basename "$CONFIG")"
+TOGGLES_DIR="$HOME/.local/state/omarchy/toggles"
+TOGGLE_F="bar-off"
 SYNC="$HOME/.local/bin/barista-bar-gap-sync"
+
+mkdir -p "$TOGGLES_DIR" 2>/dev/null || true
 
 bar_state() {
   python3 -c "
@@ -26,6 +32,10 @@ try:
 except Exception:
     print('UNKNOWN')
 " 2>/dev/null
+}
+
+bar_hidden() {
+  [[ -f "$TOGGLES_DIR/$TOGGLE_F" ]] && echo yes || echo no
 }
 
 hypr_css() {
@@ -43,9 +53,11 @@ except Exception:
 }
 
 LAST_BAR="$(bar_state)"
+LAST_HIDDEN="$(bar_hidden)"
 LAST_HYPR="$(hypr_css)"
 
-# inotify stream in the background; hypr poll in the foreground loop.
+# inotify streams in the background; hypr poll in the foreground loop.
+# The toggles dir watch fires on bar-off create/delete (toggle on/off).
 inotifywait -m -e close_write,moved_to,create --format "%e %f" "$DIR" 2>/dev/null | while read -r events file; do
   [[ "$file" == "$BASE_F" ]] || continue
   sleep 0.2
@@ -58,7 +70,18 @@ inotifywait -m -e close_write,moved_to,create --format "%e %f" "$DIR" 2>/dev/nul
 done &
 INOTIFY_PID=$!
 
-trap 'kill "$INOTIFY_PID" 2>/dev/null; exit 0' INT TERM EXIT
+inotifywait -m -e create,delete,moved_to,close_write --format "%e %f" "$TOGGLES_DIR" 2>/dev/null | while read -r events file; do
+  [[ "$file" == "$TOGGLE_F" ]] || continue
+  HIDDEN="$(bar_hidden)"
+  if [[ "$HIDDEN" != "$LAST_HIDDEN" ]]; then
+    LAST_HIDDEN="$HIDDEN"
+    "$SYNC" >/dev/null 2>&1
+    LAST_HYPR="$(hypr_css)"
+  fi
+done &
+TOGGLES_PID=$!
+
+trap 'kill "$INOTIFY_PID" "$TOGGLES_PID" 2>/dev/null; exit 0' INT TERM EXIT
 
 while sleep 3; do
   CSS="$(hypr_css)"

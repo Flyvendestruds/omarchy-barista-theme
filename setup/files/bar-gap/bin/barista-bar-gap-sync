@@ -3,8 +3,9 @@
 # The OTHER sides follow your live Hyprland gap size — nothing is
 # hardcoded: BASE is read from the current effective gaps_out on every
 # run, so manual `hyprctl` edits and looknfeel changes stick.
-# transparent bar -> gaps_out on the bar side = 0
-# solid bar      -> gaps_out on the bar side = BASE
+# transparent bar (and shown) -> gaps_out on the bar side = 0
+# solid bar OR bar hidden (bar-off toggle) -> gaps_out = BASE.
+# A hidden bar leaves an empty strip at gap 0, so hidden counts as solid.
 # Triggered by: systemd watcher (shell.json writes + hypr poll), theme-set
 # and post-boot hooks. Idempotent and safe to run any time Hyprland is up.
 
@@ -111,7 +112,9 @@ else
 fi
 [[ "$BASE" =~ ^[0-9]+$ ]] || BASE="$FALLBACK_BASE"
 
-if [[ $TRANSPARENT == "true" ]]; then
+# Hidden bar (bar-off toggle file exists) keeps the solid gap — at gap 0 a
+# hidden bar leaves an empty strip where the bar was.
+if [[ $TRANSPARENT == "true" && ! -f $HOME/.local/state/omarchy/toggles/bar-off ]]; then
   EDGE=0
 else
   EDGE=$BASE

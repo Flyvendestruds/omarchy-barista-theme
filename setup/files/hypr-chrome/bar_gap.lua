@@ -1,6 +1,7 @@
 -- Bar-aware top gap: reads ~/.config/omarchy/shell.json on every reload.
--- transparent bar  -> gaps_out on the bar side = 0 (bar floats over wallpaper)
--- solid bar        -> gaps_out on the bar side = your live gap size
+-- transparent bar (and bar shown) -> gaps_out on the bar side = 0
+-- solid bar OR bar hidden (bar-off toggle) -> gaps_out = live base size.
+-- A hidden bar leaves an empty strip at gap 0, so hidden counts as solid.
 -- Honors bar.position: applies the zero on the bar side only, keeps
 -- your other sides as they are (read live from Hyprland, never a
 -- hardcoded constant, so manual tweaks survive reloads).
@@ -36,6 +37,21 @@ local function read_shell_config()
 end
 
 local bar = read_shell_config() or { transparent = true, position = "top" }
+
+-- bar-off toggle: ~/.local/state/omarchy/toggles/bar-off exists while the
+-- bar is hidden. A hidden bar must keep the solid gap, otherwise windows
+-- sit at gap 0 with an empty strip where the bar was.
+local function bar_hidden()
+  local path = (os.getenv("HOME") or "") .. "/.local/state/omarchy/toggles/bar-off"
+  local file = io.open(path, "r")
+  if file then
+    file:close()
+    return true
+  end
+  return false
+end
+
+local hidden = bar_hidden()
 
 -- Base = live gaps_out with the bar side excluded, so a manual size set
 -- in looknfeel (or via hyprctl) sticks across reloads instead of being
@@ -85,7 +101,7 @@ local function live_base(position)
 end
 
 local base = live_base(bar.position)
-local edge_gap = bar.transparent and BAR_GAP_TRANSPARENT or base
+local edge_gap = (bar.transparent and not hidden) and BAR_GAP_TRANSPARENT or base
 
 local gaps_out = {
   top = base,
