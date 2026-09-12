@@ -22,6 +22,7 @@ elsewhere — the shell shadow patch, hypr window chrome — comes via `setup/`:
 ```
 ./setup.sh                    # everything (asks sudo for system steps only)
 ./setup.sh --step hypr-chrome # one step
+./setup.sh --step weather     # optional weather add-on only
 ./setup.sh --revert           # undo everything, reverse order
 omarchy restart shell && hyprctl reload
 ```
@@ -34,6 +35,12 @@ omarchy restart shell && hyprctl reload
 | `theme-dev` | live-edit loop (`barista-tokens-apply` + watcher units). Dev-only, skip on fresh machines | `~/.local/bin`, user systemd |
 | `update-hook` | post-update repair (re-runs `shell-shadows` after `omarchy update`, notifies) | `~/.config/omarchy/hooks/post-update.d` |
 | `panel-switch` | one-click switching between bar popouts (clicking another widget opens it instead of just closing the current one) | `/usr/share/omarchy` (sudo) |
+| `panel-morph` | morph between panels (new card reshapes from the old one when close; gentle scale+fade when far) | `/usr/share/omarchy` (sudo) |
+| `weather` *(optional)* | barista weather add-on: installs + enables [omarchy-barista-weather](https://github.com/Flyvendestruds/omarchy-barista-weather) (hourly strip, PNG icons, sky-tinted card). Skipped unless you run `./setup.sh --step weather` | `~/.config/omarchy/plugins/` |
+
+> `setup.sh` runs every step including `weather`. To skip the add-on, run
+> the steps you want individually (`./setup.sh --step hypr-chrome`, …) or
+> `./setup.sh --revert --step weather` afterwards — stock weather returns.
 
 Without setup the theme still works — flat cards, stock borders. Shadows and
 window chrome are the soft part.

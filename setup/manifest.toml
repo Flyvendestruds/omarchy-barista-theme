@@ -26,3 +26,12 @@ steps:
     file: steps/60-panel-switch.sh
     needs_root: true
     description: one-click panel switch (forward bar clicks across widgets while a panel is open)
+  - id: panel-morph
+    file: steps/61-panel-morph.sh
+    needs_root: true
+    description: morph between panels (new card reshapes from the old one, content fades in late)
+  - id: weather
+    file: steps/70-weather.sh
+    needs_root: false
+    optional: true
+    description: barista weather add-on (installs + enables omarchy-barista-weather plugin)
