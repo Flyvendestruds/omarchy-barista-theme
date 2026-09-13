@@ -23,26 +23,30 @@ fi
 [[ "$MODE" == "apply" ]] || { echo "usage: $0 [apply|revert]" >&2; exit 1; }
 if (( EUID != 0 )); then echo "shell-shadows: must run as root (sudo)" >&2; exit 1; fi
 
-echo "== 1. BorderSurface.qml (layer shadow) =="
+echo "== 1. BorderSurface.qml (sibling shadow) =="
 bak "$SHELL_DIR/Ui/BorderSurface.qml"
 python3 - <<'EOF'
 import pathlib
 p = pathlib.Path('/usr/share/omarchy/shell/Ui/BorderSurface.qml')
 src = p.read_text()
-# Migrate: drop the old RectangularShadow-child implementation. A shadow
-# child is clipped by clip:true, which cards like notifications set on
-# themselves (QML clips children, blur included) — so those cards lost
-# their shadow entirely. The layer effect below is not a child and is
-# unaffected by clip.
-start = src.find('  // Compositor-independent drop shadow. First child')
+# Migrate: drop the MultiEffect layer implementation. A layer effect renders
+# the WHOLE card subtree into an offscreen texture first — including text and
+# icons — so the shadow pass picks up every glyph's alpha and the text looks
+# embossed/shadowed. The sibling RectangularShadow below shadows only the
+# card's rounded-rectangle silhouette; content stacked above it is untouched.
+start = src.find('  // Compositor-independent drop shadow via the item layer')
 if start != -1:
-    end = src.find('\n  }\n', start)
-    assert end != -1, "unterminated legacy shadow block"
-    src = src[:start] + src[end + len('\n  }\n'):]
-    print("BorderSurface: removed legacy shadow child")
+    end_marker = '    shadowVerticalOffset: Style.shadowOffsetY\n  }\n'
+    end = src.find(end_marker, start)
+    assert end != -1, "unterminated layer shadow block"
+    src = src[:start] + src[end + len(end_marker):]
+    print("BorderSurface: removed layer shadow")
+# RectangularShadow and the old MultiEffect both live in QtQuick.Effects —
+# keep the import unconditionally.
 if 'import QtQuick.Effects' not in src:
     src = src.replace('import QtQuick\nimport qs.Commons',
                       'import QtQuick\nimport QtQuick.Effects\nimport qs.Commons', 1)
+    print("BorderSurface: ensured QtQuick.Effects import")
 if 'property bool shadow:' not in src:
     src = src.replace('''  readonly property bool usesOverlayBorder: Border.needsOverlay(borderSpec)''',
 '''  // Opt-in drop shadow for top-level cards. Small controls, rows, bar
@@ -52,29 +56,48 @@ if 'property bool shadow:' not in src:
   readonly property bool shadowActive: shadow && Style.shadowEnabled
 
   readonly property bool usesOverlayBorder: Border.needsOverlay(borderSpec)''', 1)
-if 'layer.effect: MultiEffect' not in src:
+if 'RectangularShadow {' not in src:
     src = src.replace('''  border.width: Border.canUseNative(borderSpec) ? Border.uniformWidth(borderSpec) : 0
 ''',
 '''  border.width: Border.canUseNative(borderSpec) ? Border.uniformWidth(borderSpec) : 0
 
-  // Compositor-independent drop shadow via the item layer (NOT a child —
-  // see migration note above). MultiEffect derives the silhouette from the
-  // card itself, so rounded corners are respected with no radius wiring.
-  // Layer is off unless a shadow is actually requested: zero cost otherwise.
-  layer.enabled: root.shadowActive
-  layer.smooth: true
-  layer.effect: MultiEffect {
-    autoPaddingEnabled: true
-    shadowEnabled: root.shadowActive
-    shadowColor: Style.shadowBaseColor
-    shadowOpacity: Style.shadowOpacity
-    shadowBlur: Style.shadowBlur
-    shadowHorizontalOffset: Style.shadowOffsetX
-    shadowVerticalOffset: Style.shadowOffsetY
+  // Compositor-independent drop shadow. First child, negative z, so it
+  // paints below the fill and tracks card geometry + radius. Unlike a
+  // layer effect, this child shadows only the card silhouette — text and
+  // icons stacked above it are unaffected.
+  RectangularShadow {
+    anchors.fill: parent
+    z: -1
+    visible: root.shadowActive
+    offset.x: Style.shadowOffsetX
+    offset.y: Style.shadowOffsetY
+    color: Style.shadowColor
+    blur: Style.shadowBlur
+    radius: root.radius
+    spread: Style.shadowSpread
   }
 ''', 1)
+# Tidy the blank lines the layer-block removal leaves behind: the removed
+# block sat between two blank lines, so after the insert above there are
+# three newlines between the shadow block and the Loader.
+old = '''    spread: Style.shadowSpread
+  }
+
+
+
+  Loader {'''
+new = '''    spread: Style.shadowSpread
+  }
+
+  Loader {'''
+if old in src:
+    src = src.replace(old, new, 1)
+# NotificationCard sets clip:true on itself, which would clip this shadow
+# child (QML clips children, blur included). border-radius clipping for the
+# fill is already handled by the Rectangle itself; the card's inner scroll
+# areas keep their own clip:true. So drop the self-clip on the card.
 p.write_text(src)
-print("BorderSurface patched (layer shadow)")
+print("BorderSurface patched (sibling shadow)")
 EOF
 
 echo "== 2. Style.qml (shadow tokens) =="
@@ -111,55 +134,57 @@ if 'shadowOverrides' not in src:
   }
 
   readonly property bool shadowEnabled: boolToken(shadowOverrides["enabled"], true)
-  // Base color kept opaque: MultiEffect takes color + opacity separately.
-  // (The old sibling-shadow design used a pre-multiplied shadowColor;
-  // kept for reference but no longer consumed.)
+  // RectangularShadow takes a pre-multiplied color (alpha folded in via
+  // opacity).
   readonly property color shadowBaseColor: resolveStateColor(
     String(shadowOverrides["color"] || "").length > 0 ? String(shadowOverrides["color"]) : "#000000",
     Color.foreground, Color.accent, Color.urgent, Qt.rgba(0, 0, 0, 1))
   readonly property color shadowColor: Util.alpha(shadowBaseColor, shadowAlpha("opacity", 0.45))
-  readonly property real shadowOpacity: shadowAlpha("opacity", 0.45)
-  readonly property real shadowBlur: Math.max(0, shadowNum("blur", 0.9))
+  readonly property real shadowBlur: Math.max(0, shadowNum("blur", 28))
   readonly property real shadowSpread: shadowNum("spread", 0)
   readonly property real shadowOffsetX: shadowNum("offset-x", 0)
   readonly property real shadowOffsetY: shadowNum("offset-y", 6)
 
   // Bleed room the blur needs around the card so the window does not clip
   // it. PopupCard grows its window by this; fullscreen overlays don't need it.
-  // MultiEffect blur is 0..1 normalized; bleed scales with card size.
-  readonly property int shadowMargin: (shadowEnabled && shadowOpacity > 0)
-    ? Math.ceil(Math.min(1, shadowBlur) * 96 + Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)))
+  // RectangularShadow blur is in px, so the margin tracks it 1:1.
+  readonly property int shadowMargin: shadowEnabled
+    ? Math.ceil(shadowBlur + Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)))
     : 0
 ''', 1)
     print("Style: token block inserted")
 else:
     print("Style: token block present, migrating values")
-    # migrate blur default 28px (sibling-shadow era) -> 0.9 (MultiEffect 0..1)
-    src2 = src.replace('shadowNum("blur", 28)', 'shadowNum("blur", 0.9)')
+    # migrate blur default 0.9 (MultiEffect 0..1 era) -> 28px (RectangularShadow px)
+    src2 = src.replace('shadowNum("blur", 0.9)', 'shadowNum("blur", 28)')
     if src2 != src:
         src = src2
-        print("Style: blur default 28 -> 0.9")
-    # ensure shadowOpacity exists (layer-shadow era needs it)
-    if 'readonly property real shadowOpacity' not in src:
-        src = src.replace(
-'''  readonly property color shadowColor: Util.alpha(shadowBaseColor, shadowAlpha("opacity", 0.45))''',
-'''  readonly property color shadowColor: Util.alpha(shadowBaseColor, shadowAlpha("opacity", 0.45))
-  readonly property real shadowOpacity: shadowAlpha("opacity", 0.45)''', 1)
-        print("Style: shadowOpacity added")
-    # update shadowMargin to normalized-blur form
-    old_margin = """  readonly property int shadowMargin: shadowEnabled
-    ? Math.ceil(shadowBlur + Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)))
+        print("Style: blur default 0.9 -> 28")
+    # drop shadowOpacity (MultiEffect-era): RectangularShadow consumes the
+    # pre-multiplied shadowColor and nothing else reads this property.
+    old_opacity = '''
+  readonly property real shadowOpacity: shadowAlpha("opacity", 0.45)'''
+    if old_opacity in src:
+        src = src.replace(old_opacity, '', 1)
+        print("Style: shadowOpacity removed")
+    # update shadowMargin to px-blur form
+    old_margin = """  readonly property int shadowMargin: (shadowEnabled && shadowOpacity > 0)
+    ? Math.ceil(Math.min(1, shadowBlur) * 96 + Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)))
     : 0"""
     if old_margin in src:
         src = src.replace(old_margin,
-"""  readonly property int shadowMargin: (shadowEnabled && shadowOpacity > 0)
-    ? Math.ceil(Math.min(1, shadowBlur) * 96 + Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)))
+"""  readonly property int shadowMargin: shadowEnabled
+    ? Math.ceil(shadowBlur + Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)))
     : 0""", 1)
-        print("Style: shadowMargin normalized")
-    # refresh comments that reference the old design
+        print("Style: shadowMargin de-normalized")
+    # refresh comments that reference the old design. NOTE: the \n sequences
+    # below are QML/JS string escapes inside the generated python — they must
+    # stay literal backslash-n through the shell heredoc. This is a no-op on
+    # the live Style.qml (comment already refreshed); it only fires on older
+    # checkouts.
     src = src.replace(
-"  // Base color kept opaque: MultiEffect takes color + opacity separately.\n  // (The old sibling-shadow design used a pre-multiplied shadowColor;\n  // kept for reference but no longer consumed.)",
 "  // Base color kept opaque: MultiEffect takes color + opacity separately.",
+"  // RectangularShadow takes a pre-multiplied color (alpha folded in via\n  // opacity).",
 )
 # shared parser wiring (both branches): route [shadow] into shadowOverrides
 if 'var shadowOut = {}' not in src:
@@ -198,9 +223,9 @@ enabled  = true
 # Palette role (foreground, accent, ...) or hex. Alpha comes from opacity.
 color    = "#000000"
 opacity  = 0.45
-# MultiEffect shadowBlur, normalized 0..1 (0.9 ~= old 28px sibling blur).
-blur     = 0.9
-# Spread is a RectangularShadow-only concept; kept as a no-op for compat.
+# RectangularShadow blur is in px; also drives Style.shadowMargin bleed.
+blur     = 28
+# Spread in px; 0 follows the card silhouette.
 spread   = 0
 offset-x = 0
 offset-y = 6
@@ -280,6 +305,11 @@ print("OSD patched" if changed else "OSD already patched")
 EOF
 
 echo "== 6. Opt in top-level cards (menu, clipboard, emojis, keyboard, polkit, reminders, dialog, lock, notifications) =="
+# NotificationCard is special: it sets clip:true on itself, which would
+# clip the RectangularShadow child (QML clips children, blur included).
+# The radius clipping the card needs is already handled by the Rectangle
+# fill itself; the inner layout has no scrollable overflow to contain. So
+# this hunk also drops the self-clip on the notification card.
 python3 - <<'EOF'
 import pathlib, re
 SHELL = pathlib.Path('/usr/share/omarchy/shell')
@@ -324,6 +354,23 @@ for rel, idline in targets.items():
         continue
     p.write_text(''.join(out))
     print(f"opted in: {rel}")
+
+# NotificationCard self-clip would eat the sibling shadow (QML clips
+# children, blur included). The Rectangle fill already clips to its own
+# radius; the inner layout has no scrollable overflow to contain.
+p = SHELL/'plugins/notifications/components/NotificationCard.qml'
+src = p.read_text()
+old = '''  borderSpec: cardBorderSpec
+  clip: true
+'''
+new = '''  borderSpec: cardBorderSpec
+'''
+if old in src:
+    src = src.replace(old, new, 1)
+    p.write_text(src)
+    print("unclipped: plugins/notifications/components/NotificationCard.qml")
+else:
+    print("unclipped already (or upstream changed): plugins/notifications/components/NotificationCard.qml")
 EOF
 
 echo "== 7. Menu height clamp (leave room for shadow bleed) =="
@@ -397,6 +444,23 @@ for rel, idline in targets.items():
         continue
     p.write_text(''.join(out))
     print(f"opted in: {rel}")
+
+# Same self-clip fix as hunk 6, for the cloned notification card.
+p = OV/'barista.notifications/components/NotificationCard.qml'
+if p.exists():
+    src = p.read_text()
+    old = '''  borderSpec: cardBorderSpec
+  clip: true
+'''
+    if old in src:
+        src = src.replace(old, '''  borderSpec: cardBorderSpec
+''', 1)
+        p.write_text(src)
+        print("unclipped: barista.notifications/components/NotificationCard.qml")
+    else:
+        print("unclipped already (or customized): barista.notifications/components/NotificationCard.qml")
+else:
+    print("no override, skip: barista.notifications/components/NotificationCard.qml")
 
 # OSD override: margin + opt-in (mirrors hunk 5)
 p = OV/'barista.osd/Osd.qml'
