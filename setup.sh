@@ -9,9 +9,10 @@
 set -euo pipefail
 SETUP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-STEPS_ORDER=(shell-shadows hypr-chrome bar-gap theme-dev update-hook panel-switch panel-morph weather)
+STEPS_ORDER=(shell-shadows theme-install hypr-chrome bar-gap theme-dev update-hook panel-switch panel-morph weather)
 step_file() { case "$1" in
   shell-shadows) echo "$SETUP_ROOT/setup/steps/10-shell-shadows.sh";;
+  theme-install) echo "$SETUP_ROOT/setup/steps/15-theme-install.sh";;
   hypr-chrome)   echo "$SETUP_ROOT/setup/steps/20-hypr-chrome.sh";;
   bar-gap)       echo "$SETUP_ROOT/setup/steps/30-bar-gap.sh";;
   theme-dev)     echo "$SETUP_ROOT/setup/steps/40-theme-dev.sh";;
@@ -36,7 +37,7 @@ done
 
 STEPS=()
 if [[ -n "$ONLY" ]]; then STEPS=("$ONLY")
-elif [[ "$MODE" == "revert" ]]; then STEPS=(weather panel-morph panel-switch update-hook theme-dev bar-gap hypr-chrome shell-shadows)
+elif [[ "$MODE" == "revert" ]]; then STEPS=(weather panel-morph panel-switch update-hook theme-dev bar-gap hypr-chrome theme-install shell-shadows)
 else STEPS=("${STEPS_ORDER[@]}"); fi
 
 for step in "${STEPS[@]}"; do

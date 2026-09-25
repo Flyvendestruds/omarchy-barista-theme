@@ -6,7 +6,13 @@ to be yours, normal enough that nobody asks what OS that is.
 
 ```
 omarchy theme install https://github.com/Flyvendestruds/omarchy-barista-theme
+./setup.sh                    # installs barista-dark + behavior (asks sudo for system steps only)
 ```
+
+Barista Dark (warm espresso night variant) ships in `barista-dark/` but
+`omarchy theme install` only stages the root as `barista` — run `./setup.sh`
+(or `./setup.sh --step theme-install`) to install it, then
+`omarchy theme set barista-dark`.
 
 ## What's inside
 
@@ -30,6 +36,7 @@ omarchy restart shell && hyprctl reload
 | Step | What | Where |
 |------|------|-------|
 | `shell-shadows` | QML card shadows (`BorderSurface` + `Style` + card opt-ins + template default) + live per-side shell gaps (toasts/OSD track the bar edge) | `/usr/share/omarchy` (sudo) |
+| `theme-install` | installs `barista-dark/` into `~/.config/omarchy/themes/` (theme install only stages `barista`) | `~/.config/omarchy/themes/` |
 | `hypr-chrome` | gated looknfeel (rounding/gaps/borders, replaces `my_theme_gen`) + single-window borders + bar-aware gaps | `~/.config/hypr/` |
 | `bar-gap` | live gap sync when bar transparency changes; runs only while barista is active (theme-set/post-boot gates) | `~/.local/bin`, user systemd, hooks |
 | `theme-dev` | live-edit loop (`barista-tokens-apply` + watcher units). Dev-only, skip on fresh machines | `~/.local/bin`, user systemd |

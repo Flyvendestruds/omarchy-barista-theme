@@ -6,6 +6,10 @@ steps:
     file: steps/10-shell-shadows.sh
     needs_root: true
     description: QML card shadows (BorderSurface + Style + card opt-ins + template default)
+  - id: theme-install
+    file: steps/15-theme-install.sh
+    needs_root: false
+    description: install barista-dark variant into ~/.config/omarchy/themes (theme install only stages barista)
   - id: hypr-chrome
     file: steps/20-hypr-chrome.sh
     needs_root: false
