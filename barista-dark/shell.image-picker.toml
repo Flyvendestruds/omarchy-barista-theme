@@ -1,0 +1,10 @@
+[image-picker]
+# Wallpaper picker carousel. No card here — scrim IS the surface
+# (fullscreen wash); selected/unselected-border ring the slices.
+scrim                   = "#120e0c"
+scrim-alpha             = 0.5
+text                    = "#e8ddd0"
+selected-border         = "#7aa2f7"
+selected-border-alpha   = 1.0
+unselected-border       = "#e8ddd0"
+unselected-border-alpha = 0.28

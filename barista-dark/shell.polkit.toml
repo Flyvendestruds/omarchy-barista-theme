@@ -1,0 +1,14 @@
+[polkit]
+# Sudo/password prompt. text-error = wrong-password tint. accent = lock
+# glyph color + text-selection tint inside the prompt.
+background       = "#211a15"
+background-alpha = 1.0
+text             = "#e8ddd0"
+text-error       = "#f38ba8"
+border           = "hyprland.active-border"
+border-error     = "#f38ba8"
+border-alpha     = 1.0
+scrim            = "#120e0c"
+scrim-alpha      = 0.0
+# accent is the lock-icon glyph color + text-selection tint.
+accent           = "#7aa2f7"

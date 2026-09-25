@@ -47,12 +47,17 @@ window chrome are the soft part.
 
 ## Hacking on barista
 
-Theme files live at the repo root (`colors.toml`, `shell.*.toml`). Push them
-live with `./setup/sync-theme.sh` (copies into
-`~/.config/omarchy/themes/barista/`); the tokens watcher re-renders
-`shell.toml` and pushes it to the running shell on every save. Hypr chrome
-lives in `setup/files/hypr-chrome/` — edit there, re-run
+Theme files live at the repo root (`colors.toml`, `shell.*.toml`); the dark
+variant lives in `barista-dark/` (same layout, warm espresso palette).
+Push them live with `./setup/sync-theme.sh` (copies into
+`~/.config/omarchy/themes/barista/` and `.../barista-dark/`); the tokens
+watcher re-renders `shell.toml` and pushes it to the running shell on every
+save. Hypr chrome lives in `setup/files/hypr-chrome/` — edit there, re-run
 `./setup.sh --step hypr-chrome`, `hyprctl reload` to preview.
+
+`barista-dark/backgrounds/` ships only a `.gitkeep` — bring your own night
+wallpaper (the author's pick, Osaka Jade's `2-shaded-entrance.jpg`, is stock
+Omarchy art, not redistributed here).
 
 Without setup the theme still works — flat cards, stock borders. Shadows and
 window chrome are the soft part.

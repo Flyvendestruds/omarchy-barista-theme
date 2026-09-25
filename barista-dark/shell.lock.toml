@@ -1,0 +1,15 @@
+[lock]
+# Lock screen password box. border cycles idle -> typing (border-active) ->
+# wrong password (border-error). Test: `omarchy system lock`.
+background       = "#211a15"
+background-alpha = 1.0
+text             = "#e8ddd0"
+placeholder      = "#8a7f72"
+text-error       = "#f38ba8"
+border           = "hyprland.active-border"
+border-active    = "hyprland.active-border"
+border-error     = "#f38ba8"
+border-alpha     = 1.0
+# selection is the text-selection tint inside the input field.
+selection        = "#7aa2f7"
+selection-alpha  = 0.45

@@ -1,0 +1,8 @@
+[shadow]
+enabled = true
+color = "#000000"
+opacity = 0.5
+blur = 28
+spread = 0
+offset-x = 0
+offset-y = 6

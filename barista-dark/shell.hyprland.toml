@@ -1,0 +1,6 @@
+[hyprland]
+# Indirect tokens: other sections point at these ("hyprland.active-border")
+# so popups, menus, lock, notifications share the window-border look.
+# Change the SOURCE here, not in every section.
+active-border            = "#7aa2f7"
+active-border-foreground = "#e8ddd0"

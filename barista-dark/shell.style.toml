@@ -1,0 +1,10 @@
+[style]
+# Shell corner radius (px) — theme-owned pin for Style.cornerRadius.
+# Barista ships 10 to match barista-looknfeel.lua (rounding = 10); this is
+# the value live on this machine today via `hyprctl getoption
+# decoration:rounding`. Other themes ship no [style] section and keep
+# following hyprctl, so they are untouched.
+# Consumed by the step-10 hunk-12 Style.qml patch (cornerRadiusPinned /
+# applyRoundingPin): the pin wins over the hyprctl poll while present; without the patch
+# this section is inert. Revert: delete this file.
+corner-radius = 10
