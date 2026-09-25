@@ -2,7 +2,7 @@
 # App launcher overlay (SUPER+SPACE). scrim = fullscreen dim behind the
 # card; background = the card. selected-* = highlighted row.
 background                = "#ffffff"
-background-alpha          = 0.95
+background-alpha          = 1
 text                      = "#4c4f69"
 border                    = "hyprland.active-border-foreground"
 border-alpha              = 1.0

@@ -1,11 +1,18 @@
 #!/bin/bash
-# barista-tokens-apply: live-apply ~/.config/omarchy/themes/barista/ edits.
+# barista-tokens-apply: live-apply barista theme edits.
 # Regenerates shell.toml from colors.toml + shell.*.toml overrides (same
 # pipeline `omarchy theme set` uses) and pushes it to the running shell.
+# Applies to whichever barista-family theme is active ("barista" or
+# "barista-dark"), resolved from ~/.local/state/omarchy/current/theme.name.
 # Triggered by barista-tokens-watcher.path on save; safe to run by hand.
 set -euo pipefail
 
-THEME_DIR="$HOME/.config/omarchy/themes/barista"
+ACTIVE="$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+case "$ACTIVE" in
+  barista|barista-dark) THEME_NAME="$ACTIVE" ;;
+  *) THEME_NAME="barista" ;;
+esac
+THEME_DIR="$HOME/.config/omarchy/themes/$THEME_NAME"
 CURRENT="$HOME/.local/state/omarchy/current/theme"
 STAGE="$HOME/.local/state/omarchy/current/next-theme"
 LOCK="${XDG_RUNTIME_DIR:-/tmp}/omarchy-theme-set.lock"

@@ -17,6 +17,21 @@ PathChanged=%h/.config/omarchy/themes/barista/shell.polkit.toml
 PathChanged=%h/.config/omarchy/themes/barista/shell.lock.toml
 PathChanged=%h/.config/omarchy/themes/barista/shell.image-picker.toml
 PathChanged=%h/.config/omarchy/themes/barista/shell.shadow.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/colors.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.bar.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.hyprland.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.controls.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.spacing.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.font.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.popups.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.tooltip.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.notifications.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.launcher.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.menu.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.polkit.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.lock.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.image-picker.toml
+PathChanged=%h/.config/omarchy/themes/barista-dark/shell.shadow.toml
 
 [Install]
 WantedBy=paths.target

@@ -9,7 +9,7 @@ THEME="${1:-}"
 BIN="$HOME/.local/bin/barista-bar-gap-sync"
 UNIT="barista-bar-gap-watcher.service"
 
-if [[ "$THEME" == "barista" ]]; then
+if [[ "$THEME" == "barista" || "$THEME" == "barista-dark" ]]; then
   systemctl --user enable --now "$UNIT" >/dev/null 2>&1 || true
   "$BIN" >/dev/null 2>&1 &
 else

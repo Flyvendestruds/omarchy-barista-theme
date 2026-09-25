@@ -7,7 +7,7 @@ CURRENT="$HOME/.local/state/omarchy/current/theme.name"
 UNIT="barista-bar-gap-watcher.service"
 BIN="$HOME/.local/bin/barista-bar-gap-sync"
 
-if [[ -f "$CURRENT" ]] && [[ "$(cat "$CURRENT" 2>/dev/null)" == "barista" ]]; then
+if [[ -f "$CURRENT" ]] && { [[ "$(cat "$CURRENT" 2>/dev/null)" == "barista" ]] || [[ "$(cat "$CURRENT" 2>/dev/null)" == "barista-dark" ]]; }; then
   systemctl --user enable --now "$UNIT" >/dev/null 2>&1 || true
   "$BIN" >/dev/null 2>&1 &
 else

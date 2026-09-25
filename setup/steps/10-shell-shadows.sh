@@ -604,7 +604,7 @@ else:
     var lines = String(gapStateFile.text() || "").split("\\n")
     var css = lines.length > 0 ? lines[0] : ""
     var theme = lines.length > 1 ? String(lines[1] || "").replace(/^\\s+|\\s+$/g, "").toLowerCase() : ""
-    root.baristaThemeActive = (theme === "barista")
+    root.baristaThemeActive = (theme === "barista" || theme === "barista-dark")
     var parts = String(css).match(/-?\\d+(?:\\.\\d+)?/g) || []
     var vals = []
     for (var i = 0; i < parts.length; i++) {

@@ -49,7 +49,8 @@ do_apply() {
   install_file "$FILES/systemd/barista-bar-gap-watcher.service" "$UNIT_DIR/$SERVICE"
   install_file "$FILES/hooks/bar-gap-sync.hook" "$HOOK_BOOT_DIR/bar-gap-sync.hook" exec
   install_file "$FILES/hooks/theme-set-bar-gap-sync.hook" "$HOOK_THEME_DIR/bar-gap-sync.hook" exec
-  if [[ "$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)" == "barista" ]]; then
+  _bar_gap_theme="$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)"
+  if [[ "$_bar_gap_theme" == "barista" || "$_bar_gap_theme" == "barista-dark" ]]; then
     manage_unit apply
   else
     systemctl --user disable --now "$SERVICE" >/dev/null 2>&1 || true

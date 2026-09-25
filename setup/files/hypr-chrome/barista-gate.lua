@@ -1,5 +1,6 @@
 -- Barista theme gate: single predicate every barista-owned hypr module
--- uses to decide whether to apply itself.
+-- uses to decide whether to apply itself. Covers the barista family
+-- ("barista" and "barista-dark").
 -- Reads the same theme.name file `omarchy theme set` writes, so it tracks
 -- live theme switches without a reboot (hypr re-sources lua on reload).
 -- Safe under the bind-scanner stub (no io): defaults to NOT barista, so a
@@ -15,7 +16,7 @@ function M.active()
   local name = f:read("*l") or ""
   f:close()
   name = name:gsub("^%s+", ""):gsub("%s+$", ""):lower()
-  return name == "barista"
+  return name == "barista" or name == "barista-dark"
 end
 
 return M

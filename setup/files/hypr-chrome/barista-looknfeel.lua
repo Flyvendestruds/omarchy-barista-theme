@@ -47,3 +47,8 @@ hl.animation({ leaf = "fade", enabled = true, speed = 3.03, bezier = "quick" })
 hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
 hl.animation({ leaf = "windows", enabled = true, speed = 3.79, bezier = "easeOutQuint" })
 hl.layer_rule({ match = { namespace = "^(omarchy-menu|omarchy-clipboard|omarchy-emojis|omarchy-image-selector|omarchy-polkit|omarchy-osd|omarchy-notifications|omarchy-keyboard-panel|omarchy-keyboard-panel-dismiss|omarchy-reminders|omarchy-network-qr|omarchy-disk-speedtest|omarchy-network-speedtest|omarchy-speed-test)$" }, blur = false })
+
+-- Fully opaque windows: overrides Omarchy stock window-rule opacity
+-- (default 0.985 active / 0.96 inactive, browsers 1.0 / 0.985).
+-- This module loads after the defaults, so this rule wins.
+o.window(".*", { opacity = "1 1" })
