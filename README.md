@@ -62,9 +62,9 @@ watcher re-renders `shell.toml` and pushes it to the running shell on every
 save. Hypr chrome lives in `setup/files/hypr-chrome/` — edit there, re-run
 `./setup.sh --step hypr-chrome`, `hyprctl reload` to preview.
 
-`barista-dark/backgrounds/` ships only a `.gitkeep` — bring your own night
-wallpaper (the author's pick, Osaka Jade's `2-shaded-entrance.jpg`, is stock
-Omarchy art, not redistributed here).
+`barista-dark/backgrounds/` ships `1-night-clouds.jpg`, a moonlit night
+grade of the light theme's `pastel-clouds.jpg`. `theme-install` copies it in
+only if it's missing, so wallpapers you've added yourself are left alone.
 
 Without setup the theme still works — flat cards, stock borders. Shadows and
 window chrome are the soft part.

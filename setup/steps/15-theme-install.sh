@@ -5,8 +5,9 @@
 # (named after the repo): the root files land in themes/barista, but
 # barista-dark/ stays nested inside and Omarchy never looks there.
 # This step copies barista-dark/ -> ~/.config/omarchy/themes/barista-dark/
-# (theme files only; backgrounds/ is user-owned and never touched, so a
-# custom night wallpaper survives re-runs).
+# (theme files, plus any shipped backgrounds the user doesn't have yet;
+# existing wallpapers are never overwritten, so a custom night wallpaper
+# survives re-runs).
 # Idempotent. No sudo needed.
 set -euo pipefail
 
@@ -29,7 +30,15 @@ do_apply() {
     echo "theme-install: $base"
     n=$((n+1))
   done
-  echo "theme-install: $n file(s) in $DEST (backgrounds untouched)"
+  for f in "$SRC"/backgrounds/*; do
+    [[ -f "$f" ]] || continue
+    base="$(basename "$f")"
+    [[ -e "$DEST/backgrounds/$base" ]] && continue
+    cp "$f" "$DEST/backgrounds/$base"
+    echo "theme-install: backgrounds/$base"
+    n=$((n+1))
+  done
+  echo "theme-install: $n file(s) in $DEST (existing backgrounds untouched)"
   echo "theme-install: applied (switch with: omarchy theme set barista-dark)"
 }
 
