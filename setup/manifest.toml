@@ -26,6 +26,10 @@ steps:
     file: steps/50-update-hook.sh
     needs_root: false
     description: post-update repair (re-run shell-shadows + notify)
+  - id: plugin-clones
+    file: steps/55-plugin-clones.sh
+    needs_root: false
+    description: regenerate barista.* shell plugin clones from installed stock + barista look (re-run after updates)
   - id: panel-switch
     file: steps/60-panel-switch.sh
     needs_root: true

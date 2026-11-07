@@ -29,10 +29,14 @@
 set -euo pipefail
 SHELL_DIR="${SHELL_DIR:-/usr/share/omarchy/shell}"
 BAK_SUFFIX=".bak-barista3"
-bak() { cp -n "$1" "$1$BAK_SUFFIX" 2>/dev/null || true; }
+# Version-aware backups (see setup/files/lib/barista-bak.sh).
+source "${BARISTA_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../files/lib}/barista-bak.sh"
 
 MODE="${1:-apply}"
 if [[ "$MODE" == "revert" ]]; then
+  # Drop backups from an older omarchy first: restoring those would put
+  # old QML on top of a newer shell.
+  barista_bak_sync_version
   n=0
   while IFS= read -r f; do
     mv "$f" "${f%$BAK_SUFFIX}"; n=$((n+1)); echo "panel-morph: restored ${f%$BAK_SUFFIX}"
@@ -41,6 +45,17 @@ if [[ "$MODE" == "revert" ]]; then
   exit 0
 fi
 [[ "$MODE" == "apply" ]] || { echo "usage: $0 [apply|revert]" >&2; exit 1; }
+# omarchy 4.5 ships panel morphing natively (KeyboardPanel.morphFromLastCard:
+# a same-section takeover reshapes from the previous card and fades content
+# in). Patching our morph on top would run two engines on one card, so this
+# step retires itself there. Checked before the root gate: no sudo needed
+# for a no-op. Revert above still restores older trees.
+if grep -q 'function morphFromLastCard' "$SHELL_DIR/Ui/KeyboardPanel.qml" 2>/dev/null; then
+  echo "panel-morph: native panel morph present (omarchy >= 4.5) — nothing to patch."
+  # Still clear any pre-4.5 backups so a later revert can't restore them.
+  (( EUID == 0 )) && barista_bak_sync_version
+  exit 0
+fi
 # Scratch-dir runs (SHELL_DIR overridden, e.g. tests) skip the root gate —
 # only the real system path needs sudo.
 if [[ "$SHELL_DIR" == "/usr/share/omarchy/shell" ]] && (( EUID != 0 )); then echo "panel-morph: must run as root (sudo)" >&2; exit 1; fi

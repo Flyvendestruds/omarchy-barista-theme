@@ -22,10 +22,14 @@
 set -euo pipefail
 SHELL_DIR="${SHELL_DIR:-/usr/share/omarchy/shell}"
 BAK_SUFFIX=".bak-barista2"
-bak() { cp -n "$1" "$1$BAK_SUFFIX" 2>/dev/null || true; }
+# Version-aware backups (see setup/files/lib/barista-bak.sh).
+source "${BARISTA_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../files/lib}/barista-bak.sh"
 
 MODE="${1:-apply}"
 if [[ "$MODE" == "revert" ]]; then
+  # Drop backups from an older omarchy first: restoring those would put
+  # old QML on top of a newer shell.
+  barista_bak_sync_version
   n=0
   while IFS= read -r f; do
     mv "$f" "${f%$BAK_SUFFIX}"; n=$((n+1)); echo "panel-switch: restored ${f%$BAK_SUFFIX}"
@@ -70,13 +74,13 @@ python3 - <<'EOF'
 import os, pathlib
 p = pathlib.Path(os.environ.get("SHELL_DIR", "/usr/share/omarchy/shell")) / "plugins/bar/Bar.qml"
 src = p.read_text()
-old = """    api.clickTargets = root.pluginClickTargets(api.pluginId)
-    api.layoutConfig = root.publicLayoutConfig()"""
+# Anchor on the clickTargets line alone: the line after it changed in
+# omarchy 4.5 (layoutConfig now takes a pre-serialised snapshot).
+old = """    api.clickTargets = root.pluginClickTargets(api.pluginId)\n"""
 new = """    api.clickTargets = root.pluginClickTargets(api.pluginId)
     // barista: one-click panel switch — full list for cross-widget
     // forwarding. Runs on every sync (incl. onClickTargetsChanged).
-    api.allClickTargets = root.clickTargets.slice()
-    api.layoutConfig = root.publicLayoutConfig()"""
+    api.allClickTargets = root.clickTargets.slice()\n"""
 if "api.allClickTargets = root.clickTargets.slice()" in src:
     print("Bar: publish present, skipping")
 elif old in src:

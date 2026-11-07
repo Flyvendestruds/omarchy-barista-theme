@@ -9,7 +9,7 @@
 set -euo pipefail
 SETUP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-STEPS_ORDER=(shell-shadows theme-install hypr-chrome bar-gap theme-dev update-hook panel-switch panel-morph weather)
+STEPS_ORDER=(shell-shadows theme-install hypr-chrome bar-gap theme-dev update-hook plugin-clones panel-switch panel-morph weather)
 step_file() { case "$1" in
   shell-shadows) echo "$SETUP_ROOT/setup/steps/10-shell-shadows.sh";;
   theme-install) echo "$SETUP_ROOT/setup/steps/15-theme-install.sh";;
@@ -17,6 +17,7 @@ step_file() { case "$1" in
   bar-gap)       echo "$SETUP_ROOT/setup/steps/30-bar-gap.sh";;
   theme-dev)     echo "$SETUP_ROOT/setup/steps/40-theme-dev.sh";;
   update-hook)   echo "$SETUP_ROOT/setup/steps/50-update-hook.sh";;
+  plugin-clones) echo "$SETUP_ROOT/setup/steps/55-plugin-clones.sh";;
   panel-switch)  echo "$SETUP_ROOT/setup/steps/60-panel-switch.sh";;
   panel-morph)   echo "$SETUP_ROOT/setup/steps/61-panel-morph.sh";;
   weather)       echo "$SETUP_ROOT/setup/steps/70-weather.sh";;
@@ -37,7 +38,7 @@ done
 
 STEPS=()
 if [[ -n "$ONLY" ]]; then STEPS=("$ONLY")
-elif [[ "$MODE" == "revert" ]]; then STEPS=(weather panel-morph panel-switch update-hook theme-dev bar-gap hypr-chrome theme-install shell-shadows)
+elif [[ "$MODE" == "revert" ]]; then STEPS=(weather panel-morph panel-switch plugin-clones update-hook theme-dev bar-gap hypr-chrome theme-install shell-shadows)
 else STEPS=("${STEPS_ORDER[@]}"); fi
 
 for step in "${STEPS[@]}"; do

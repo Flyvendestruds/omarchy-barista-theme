@@ -3,16 +3,22 @@
 # Design: BorderSurface gains opt-in `shadow` (default false) + theme tokens
 # on Style ([shadow] in shell.toml). Only top-level cards opt in; all nested
 # controls, bar slabs, rows, tooltips stay flat automatically.
-# System files: must run as root (sudo). Backs up every file to *.bak-barista1.
+# System files: must run as root (sudo). Backs up every file to *.bak-barista1 (version-aware: see
+# setup/files/lib/barista-bak.sh — stale backups from an older omarchy are
+# dropped and re-taken from the package archive).
 # Idempotent: skips hunks already applied. Usage: $0 [apply|revert].
 set -euo pipefail
 SHELL_DIR="/usr/share/omarchy/shell"
 THEME_TPL="/usr/share/omarchy/default/themed/shell.toml.tpl"
 BAK_SUFFIX=".bak-barista1"
-bak() { cp -n "$1" "$1$BAK_SUFFIX" 2>/dev/null || true; }
+# Version-aware backups (see setup/files/lib/barista-bak.sh).
+source "${BARISTA_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../files/lib}/barista-bak.sh"
 
 MODE="${1:-apply}"
 if [[ "$MODE" == "revert" ]]; then
+  # Drop backups from an older omarchy first: restoring those would put
+  # old QML on top of a newer shell.
+  barista_bak_sync_version
   n=0
   for f in $(find "$SHELL_DIR" /usr/share/omarchy/default/themed -name "*$BAK_SUFFIX" 2>/dev/null); do
     mv "$f" "${f%$BAK_SUFFIX}"; n=$((n+1)); echo "shell-shadows: restored ${f%$BAK_SUFFIX}"
@@ -305,6 +311,11 @@ print("OSD patched" if changed else "OSD already patched")
 EOF
 
 echo "== 6. Opt in top-level cards (menu, clipboard, emojis, keyboard, polkit, reminders, dialog, lock, notifications) =="
+for rel in plugins/menu/Menu.qml plugins/clipboard/Clipboard.qml plugins/emojis/Emojis.qml \
+           Ui/KeyboardPanel.qml plugins/polkit/PolkitAgent.qml plugins/reminders/ReminderFlow.qml \
+           Ui/ConfirmDialog.qml plugins/lock/LockView.qml; do
+  [[ -f "$SHELL_DIR/$rel" ]] && bak "$SHELL_DIR/$rel"
+done
 # NotificationCard is special: it sets clip:true on itself, which would
 # clip the RectangularShadow child (QML clips children, blur included).
 # The radius clipping the card needs is already handled by the Rectangle
@@ -327,6 +338,11 @@ targets = {
 }
 for rel, idline in targets.items():
     p = SHELL/rel
+    if not p.exists():
+        # omarchy 4.5 rewrote notifications (Toast.qml, no NotificationCard);
+        # a missing target must not abort the gap hunks (9-11) below.
+        print(f"SKIP {rel}: not present upstream")
+        continue
     bak = str(p) + '.bak-barista1'
     pathlib.Path(bak).write_bytes(p.read_bytes()) if not pathlib.Path(bak).exists() else None
     lines = p.read_text().splitlines(keepends=True)
@@ -359,13 +375,15 @@ for rel, idline in targets.items():
 # children, blur included). The Rectangle fill already clips to its own
 # radius; the inner layout has no scrollable overflow to contain.
 p = SHELL/'plugins/notifications/components/NotificationCard.qml'
-src = p.read_text()
+src = p.read_text() if p.exists() else ''
 old = '''  borderSpec: cardBorderSpec
   clip: true
 '''
 new = '''  borderSpec: cardBorderSpec
 '''
-if old in src:
+if not p.exists():
+    print("SKIP unclip: plugins/notifications/components/NotificationCard.qml not present upstream")
+elif old in src:
     src = src.replace(old, new, 1)
     p.write_text(src)
     print("unclipped: plugins/notifications/components/NotificationCard.qml")
@@ -639,29 +657,23 @@ else:
     p.write_text(src)
     print("Style patched (gap-following margins)")
 
-# Independent IPC hunk with its own marker: a package update can
-# revert shell.qml without reverting Style.qml.
-sp = pathlib.Path('/usr/share/omarchy/shell/shell.qml')
+# Theme-switch re-poll. Style.refresh() runs after every theme apply
+# (shell.qml applyTheme, the 4.5 background plugin's applyPendingTheme,
+# BackgroundIntro — all go through scheduleRefresh -> refreshTimer ->
+# refresh), so hook the re-poll there instead of in shell.qml, whose
+# applyTheme body upstream keeps rewriting.
+sp = pathlib.Path('/usr/share/omarchy/shell/Commons/Style.qml')
 ssrc = sp.read_text()
-if 'Style.gapStateFile.reload()' in ssrc:
-    print("shell.qml: gap re-poll already present")
+if 'gapStateFile.reload()  // barista: theme re-poll' in ssrc:
+    print("Style.refresh: gap re-poll already present")
 else:
-    old_ipc = '''    function applyTheme(colorsB64: string, shellB64: string): string {
-      var colorsRaw = ""
-      var shellRaw = ""
-      try { colorsRaw = Qt.atob(String(colorsB64 || "")) } catch (e) { colorsRaw = "" }
-      try { shellRaw = Qt.atob(String(shellB64 || "")) } catch (e2) { shellRaw = "" }
-      Color.loadColors(colorsRaw)
-      Color.loadShell(shellRaw)
-      Style.scheduleRefresh()
-      return "ok"
-    }'''
-    assert old_ipc in ssrc, "shell applyTheme IPC not found"
-    new_ipc = old_ipc.replace("      Style.scheduleRefresh()\\n",
-                              "      Style.scheduleRefresh()\\n      Style.gapStateFile.reload()\\n")
-    ssrc = ssrc.replace(old_ipc, new_ipc, 1)
-    sp.write_text(ssrc)
-    print("shell.qml: applyTheme re-polls gap state")
+    old_ref = "    gapsOutProc.running = true\n"
+    if old_ref in ssrc:
+        ssrc = ssrc.replace(old_ref, old_ref + "    gapStateFile.reload()  // barista: theme re-poll\n", 1)
+        sp.write_text(ssrc)
+        print("Style.refresh: re-polls gap state on theme apply")
+    else:
+        print("WARN Style.refresh: gapsOutProc line not found — theme-switch re-poll skipped (2s poll still covers it)")
 EOF
 
 echo "== 10. Edge-anchored margins follow per-side gaps =="
@@ -831,6 +843,11 @@ pc_pairs = [
    '          cy = root.bar.position === "bottom" ? -popupHeight - root.barGap : window.height + root.barGap'),
   ('          cx = root.bar.position === "left" ? window.width + root.margin : -popupWidth - root.margin',
    '          cx = root.bar.position === "left" ? window.width + root.barGap : -popupWidth - root.barGap'),
+  # omarchy 4.5 centerOnBar form (barThickness-relative, multi-line ternary)
+  ("            ? window.height - root.barThickness - popupHeight - root.margin\n            : root.barThickness + root.margin\n",
+   "            ? window.height - root.barThickness - popupHeight - root.barGap\n            : root.barThickness + root.barGap\n"),
+  ("            ? root.barThickness + root.margin\n            : window.width - root.barThickness - popupWidth - root.margin\n",
+   "            ? root.barThickness + root.barGap\n            : window.width - root.barThickness - popupWidth - root.barGap\n"),
 ]
 for old, new in pc_pairs:
     patch(SHELL/'Ui/PopupCard.qml', old, new)

@@ -3,6 +3,8 @@
 # wiping the QML patches (step 10 shadows + steps 60/61 panel-switch/morph,
 # root-owned).
 # User-owned steps (hypr lua, bar-gap, theme-dev) survive updates untouched.
+# The barista.* plugin clones survive too, but as frozen copies of the OLD
+# shell, so step 55 regenerates them from the new stock plugins.
 # Re-runs the root-owned steps against the LOCAL CLONE, then tells
 # the user to restart the shell. Skipped when the clone is absent (e.g.
 # theme installed on a machine without the dev checkout).
@@ -12,6 +14,8 @@ CLONE="$HOME/Work/omarchy-barista-theme"
 SHADOWS_STEP="$CLONE/setup/steps/10-shell-shadows.sh"
 SWITCH_STEP="$CLONE/setup/steps/60-panel-switch.sh"
 MORPH_STEP="$CLONE/setup/steps/61-panel-morph.sh"
+CLONES_STEP="$CLONE/setup/steps/55-plugin-clones.sh"
+LOG=/tmp/barista-post-update-setup.log
 
 if [[ ! -x "$SHADOWS_STEP" ]]; then
   omarchy-notification-send -u normal "Barista: re-apply setup after update" \
@@ -20,12 +24,24 @@ if [[ ! -x "$SHADOWS_STEP" ]]; then
   exit 0
 fi
 
-if { sudo "$SHADOWS_STEP" && sudo "$SWITCH_STEP" && sudo "$MORPH_STEP"; } >/tmp/barista-post-update-setup.log 2>&1; then
+# Each step runs even if an earlier one fails: the clone rules fall back to
+# stock spacing / flat cards without step 10, so they are always safe, and
+# one stale hunk must not block the rest (4.5 lost a whole run that way).
+ok=1
+: >"$LOG"
+for step in "$SHADOWS_STEP" "$SWITCH_STEP" "$MORPH_STEP"; do
+  echo "### sudo $step" >>"$LOG"
+  sudo "$step" >>"$LOG" 2>&1 || ok=0
+done
+echo "### $CLONES_STEP" >>"$LOG"
+"$CLONES_STEP" apply >>"$LOG" 2>&1 || ok=0
+
+if (( ok )); then
   omarchy-notification-send -u normal "Barista: patches re-applied after update" \
-    "Run: omarchy restart shell && hyprctl reload. Log: /tmp/barista-post-update-setup.log" \
+    "Run: omarchy restart shell && hyprctl reload. Log: $LOG" \
     >/dev/null 2>&1 || true
 else
   omarchy-notification-send -u critical "Barista: setup needs attention after update" \
-    "A patch hunk failed — check /tmp/barista-post-update-setup.log, then: omarchy restart shell && hyprctl reload" \
+    "A step failed — check $LOG, then: omarchy restart shell && hyprctl reload" \
     >/dev/null 2>&1 || true
 fi
