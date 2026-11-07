@@ -4,9 +4,9 @@
 # size-horizontal = top/bottom bar HEIGHT in px (at base-size 12).
 # size-vertical = left/right bar WIDTH. scale-with-font grows these with
 #   [font] base-size so bigger text doesn't clip.
-background       = "#211a15"
+background       = "#1a1d24"
 background-alpha = 1
-text             = "#e8ddd0"
+text             = "#d8dee9"
 # Modules calling attention to themselves (recording, voxtype, alerts, updates)
 active           = "#f38ba8"
 # Cross-axis size at font base-size 12. size-horizontal is the height of
